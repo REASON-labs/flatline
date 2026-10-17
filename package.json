@@ -1,0 +1,46 @@
+{
+  "name": "flatline",
+  "version": "0.1.0",
+  "description": "Self-hosted voice for web apps: speech-to-text on your own server (whisper.cpp), recording that stops on silence, and Dixie, a voice that reads text aloud. The audio never leaves your box.",
+  "type": "module",
+  "exports": {
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "default": "./dist/server/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser/index.d.ts",
+      "default": "./dist/browser/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "server",
+    "README.md",
+    "docs"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "test:browser": "npm run build && node --test test/*.browser.mjs"
+  },
+  "keywords": [
+    "speech-to-text",
+    "whisper",
+    "whisper.cpp",
+    "voice",
+    "self-hosted",
+    "privacy",
+    "mediarecorder",
+    "speechsynthesis"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "playwright": "1.63.0",
+    "typescript": "^7.0.2"
+  }
+}
