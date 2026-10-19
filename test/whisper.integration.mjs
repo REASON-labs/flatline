@@ -1,7 +1,7 @@
 // Against a REAL whisper service (server/install.sh): the formats phones actually record,
 // spoken words in, the words back out. Runs only when FLATLINE_URL and FLATLINE_SAMPLES are set
 // (CI sets both: it installs the service with the tiny model and makes the samples with
-// espeak-ng and ffmpeg). Each sample says "hello world".
+// espeak-ng and ffmpeg). Each sample says "Hello world".
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -24,11 +24,22 @@ test("the service is up", { skip }, async () => {
   assert.equal(await createTranscriber({ url }).health(), true);
 });
 
+// The samples are a synthetic voice and CI uses the tiny model, so the words come out roughly
+// ("Hello world" can be heard as "the low world"); what matters is that every format is read,
+// and read the same way.
+const heard = {};
 for (const [file, type] of SAMPLES) {
   test(`transcribes ${file} (${type})`, { skip, timeout: 120_000 }, async () => {
     const audio = new Uint8Array(await readFile(join(dir, file)));
     const r = await createTranscriber({ url }).transcribe(audio, type);
     assert.equal(r.ok, true, JSON.stringify(r));
-    assert.match(r.text.toLowerCase(), /hello/, r.text);
+    assert.match(r.text.toLowerCase(), /world/, r.text);
+    heard[file] = r.text.toLowerCase();
   });
 }
+
+test("every format gives the same words", { skip }, () => {
+  const texts = new Set(Object.values(heard));
+  assert.equal(Object.keys(heard).length, SAMPLES.length);
+  assert.equal(texts.size, 1, JSON.stringify(heard));
+});
