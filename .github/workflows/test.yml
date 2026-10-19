@@ -14,7 +14,9 @@ jobs:
       - run: npm ci
       - run: npm test
       # The built dist/ is committed (apps install from git): it must match the source.
-      - run: git diff --exit-code -- dist || (echo "dist/ is out of date: run npm run build and commit it" && exit 1)
+      - name: dist/ matches the source
+        run: |
+          git diff --exit-code -- dist || { echo "dist/ is out of date. Run npm run build and commit it."; exit 1; }
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
 
