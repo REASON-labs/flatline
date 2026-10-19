@@ -29,12 +29,12 @@ Whisper listens on loopback only.
 ## Install
 
 ```jsonc
-"dependencies": { "flatline": "github:REASON-labs/flatline#v0.1.0" }
+"dependencies": { "flatline": "github:REASON-labs/flatline#v0.1.1" }
 ```
 
 The built code is committed, so installing needs no build and no dev tools; pin a tag. A server
 that can't read the repository can use the tarball attached to each release instead
-(`"flatline": "file:vendor/flatline-0.1.0.tgz"`). See [docs/INTEGRATION.md](docs/INTEGRATION.md).
+(`"flatline": "file:vendor/flatline-0.1.1.tgz"`). See [docs/INTEGRATION.md](docs/INTEGRATION.md).
 
 ## Quick start
 
@@ -112,4 +112,5 @@ The API may still change before 1.0.
 
 ## License
 
-Not chosen yet; to be decided before the repository is made public.
+[MIT](LICENSE). whisper.cpp, which the service builds, is MIT too; the models it downloads are
+OpenAI's Whisper models (MIT).

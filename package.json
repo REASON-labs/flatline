@@ -1,7 +1,8 @@
 {
   "name": "flatline",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Self-hosted voice for web apps: speech-to-text on your own server (whisper.cpp), recording that stops on silence, and Dixie, a voice that reads text aloud. The audio never leaves your box.",
+  "license": "MIT",
   "type": "module",
   "exports": {
     "./server": {
@@ -17,7 +18,8 @@
     "dist",
     "server",
     "README.md",
-    "docs"
+    "docs",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=20"
