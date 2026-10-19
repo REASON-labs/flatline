@@ -13,6 +13,64 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      # The built dist/ is committed (apps install from git): it must match the source.
+      - run: git diff --exit-code -- dist || (echo "dist/ is out of date: run npm run build and commit it" && exit 1)
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
-      - run: bash -n server/install.sh
+
+  # The installer for real (systemd, the pinned whisper.cpp, the tiny model), then real speech in
+  # the formats phones record.
+  whisper:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: sudo FLATLINE_MODEL=tiny.en bash server/install.sh
+      - name: Make the samples ("hello world" as iPhone, Chrome and Firefox record it)
+        run: |
+          sudo apt-get install -y --no-install-recommends espeak-ng >/dev/null
+          mkdir -p samples
+          espeak-ng -s 140 -w samples/hello.wav "Hello world."
+          ffmpeg -loglevel error -i samples/hello.wav -c:a aac -b:a 64k samples/hello.m4a
+          ffmpeg -loglevel error -i samples/hello.wav -c:a libopus -b:a 32k samples/hello.webm
+          ffmpeg -loglevel error -i samples/hello.wav -c:a libopus -b:a 32k samples/hello.ogg
+      - run: npm run test:whisper
+        env:
+          FLATLINE_URL: http://127.0.0.1:8086
+          FLATLINE_SAMPLES: samples
+      - name: Re-running the installer is safe
+        run: sudo FLATLINE_MODEL=tiny.en bash server/install.sh
+      # Rehearse the move from an older hand-made whisper.service (the shape some boxes have).
+      - name: Make an "old" whisper.service on the same port
+        run: |
+          sudo systemctl disable --now flatline-whisper
+          sudo useradd --system --home /var/lib/whisper --shell /usr/sbin/nologin whisper
+          sudo install -d -o whisper -g whisper /var/lib/whisper
+          sudo cp /var/lib/flatline/ggml-tiny.en.bin /var/lib/whisper/ && sudo chown whisper: /var/lib/whisper/ggml-tiny.en.bin
+          printf '[Service]\nUser=whisper\nEnvironment=LD_LIBRARY_PATH=/opt/flatline/bin\nExecStart=/opt/flatline/bin/whisper-server --host 127.0.0.1 --port 8086 -m /var/lib/whisper/ggml-tiny.en.bin --convert\n[Install]\nWantedBy=multi-user.target\n' | sudo tee /etc/systemd/system/whisper.service >/dev/null
+          sudo systemctl daemon-reload && sudo systemctl enable --now whisper
+          sudo rm -rf /var/lib/flatline/ggml-tiny.en.bin
+      - name: Migrate (reuses the old model, same port)
+        run: |
+          sudo FLATLINE_MODEL=tiny.en bash server/migrate-from-whisper.sh
+          systemctl is-active flatline-whisper && ! systemctl is-enabled whisper && ! systemctl is-active whisper
+          test -s /var/lib/flatline/ggml-tiny.en.bin
+      - run: npm run test:whisper
+        env:
+          FLATLINE_URL: http://127.0.0.1:8086
+          FLATLINE_SAMPLES: samples
+      - name: Roll back on request
+        run: |
+          sudo bash server/migrate-from-whisper.sh --rollback
+          systemctl is-active whisper && ! systemctl is-active flatline-whisper
+      - name: A switch that fails goes back by itself
+        run: |
+          if sudo FLATLINE_MODEL=tiny.en FLATLINE_MEMORY_MAX=1M bash server/migrate-from-whisper.sh; then echo "should have failed"; exit 1; fi
+          systemctl is-active whisper && ! systemctl is-active flatline-whisper
+          curl -fsS -o /dev/null http://127.0.0.1:8086/
+      - if: failure()
+        run: sudo journalctl -u flatline-whisper -n 80 --no-pager

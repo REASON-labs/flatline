@@ -90,4 +90,10 @@ test("cleanTranscript and fileNameFor", () => {
   assert.equal(fileNameFor("audio/mp4"), "audio.m4a");
   assert.equal(fileNameFor("audio/ogg; codecs=opus"), "audio.ogg");
   assert.equal(fileNameFor(undefined), "audio.audio");
+  // What phones actually record: Safari (MP4/AAC) and Chrome or Firefox (WebM or Ogg Opus).
+  assert.equal(fileNameFor("audio/mp4;codecs=mp4a.40.2"), "audio.m4a");
+  assert.equal(fileNameFor("audio/x-m4a"), "audio.m4a");
+  assert.equal(fileNameFor("audio/aac"), "audio.aac");
+  assert.equal(fileNameFor("audio/webm;codecs=opus"), "audio.webm");
+  assert.equal(fileNameFor("audio/ogg;codecs=opus"), "audio.ogg");
 });

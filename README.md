@@ -26,6 +26,16 @@ Named for the Dixie Flatline in *Neuromancer*: a voice in the machine that talks
 The browser never talks to whisper directly: your app's endpoint decides who may send audio.
 Whisper listens on loopback only.
 
+## Install
+
+```jsonc
+"dependencies": { "flatline": "github:REASON-labs/flatline#v0.1.0" }
+```
+
+The built code is committed, so installing needs no build and no dev tools; pin a tag. A server
+that can't read the repository can use the tarball attached to each release instead
+(`"flatline": "file:vendor/flatline-0.1.0.tgz"`). See [docs/INTEGRATION.md](docs/INTEGRATION.md).
+
 ## Quick start
 
 **1. The service** (Debian or Ubuntu with systemd; about 500 MB for the default English model):
@@ -58,18 +68,21 @@ A complete minimal server is in [examples/node-server.mjs](examples/node-server.
 ```js
 import { record, transcribeOnServer, dixie } from "flatline/browser";
 
-await dixie.speak("When does your day usually start?");
-const rec = record({ silenceMs: 1500, onLevel: (l) => meter(l) });
+dixie.primeVoices();                       // once, early
+await dixie.speak("When does your day usually start?");   // "done", or "cancelled"
+const rec = record({ onLevel: (l) => meter(l) });   // also stops Dixie; 60 s at most
 // rec.stop() keeps what was said; rec.cancel() throws it away.
 const r = await rec.done;
 if (r.ok) {
-  const t = await transcribeOnServer("/api/transcribe", r.audio);
+  const t = await transcribeOnServer("/api/voice/transcribe", r.audio);
   if (t.ok) showAnswer(t.text);
 }
 ```
 
 More in [docs/BROWSER.md](docs/BROWSER.md): the stop rules, error codes, iPhone notes, and
-choosing Dixie's voice.
+choosing Dixie's voice. Adding it to an app with sign-ins (the endpoint, limits and the errors to
+show): [docs/INTEGRATION.md](docs/INTEGRATION.md). Moving a box from an older hand-made
+`whisper.service`: [docs/MIGRATING.md](docs/MIGRATING.md).
 
 ## Privacy
 
@@ -84,10 +97,13 @@ choosing Dixie's voice.
 npm install
 npm test               # build, then unit and local-network tests
 npx playwright install chromium
-npm run test:browser   # the recorder in a real Chromium with a fake microphone
+npm run test:browser   # recorder and Dixie in a real Chromium with a fake microphone
+npm run test:whisper   # against a real service: set FLATLINE_URL and FLATLINE_SAMPLES (CI does)
 ```
 
-The code is TypeScript in `src/`, built to `dist/`. Keep it dependency-free at runtime.
+The code is TypeScript in `src/`, built to `dist/`, which is committed (apps install from git):
+run `npm run build` and commit `dist/` with any change to `src/` (CI checks). Keep it
+dependency-free at runtime. Releases: bump `version`, tag `vX.Y.Z`, attach `npm pack`'s tarball.
 
 ## Status
 

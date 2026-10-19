@@ -62,31 +62,64 @@ export function loadVoices(timeoutMs = 1500): Promise<SpeechSynthesisVoice[]> {
   });
 }
 
-/** Say something. Resolves when it has been said (or stopped). One at a time: a new one cuts off the last. */
-export async function speak(text: string, opts: SpeakOptions = {}): Promise<SpeakResult> {
+/** The sentence being said now, so hush() (or the next speak) can settle it as "cancelled". */
+let current: { settle: (r: SpeakResult) => void } | null = null;
+
+/**
+ * Load the voices ahead of time (call once, early): speak() never waits for them, because on
+ * iPhone any wait between the tap and speaking can lose the tap's permission to make sound.
+ */
+export function primeVoices(): void { void loadVoices(); }
+
+/**
+ * Say something. Resolves when it has been said ("done"), or when it was stopped by hush() or
+ * a newer speak() ("cancelled"). One at a time. It starts speaking at once, with the best voice
+ * already loaded (see primeVoices).
+ */
+export function speak(text: string, opts: SpeakOptions = {}): Promise<SpeakResult> {
   const words = text.trim();
-  if (!words) return "done";
-  if (!canSpeak()) return "unavailable";
-  const voices = await loadVoices();
+  if (!words) return Promise.resolve("done");
+  if (!canSpeak()) return Promise.resolve("unavailable");
   const lang = opts.lang ?? ((typeof document !== "undefined" && document.documentElement.lang) || "en");
   const u = new SpeechSynthesisUtterance(words);
-  const v = chooseVoice(voices, lang, opts.voice);
-  if (v) { u.voice = v; u.lang = v.lang; } else u.lang = lang;
-  u.rate = Math.min(2, Math.max(0.5, opts.rate ?? 1));
+  const v = chooseVoice(speechSynthesis.getVoices(), lang, opts.voice);
+  u.lang = v?.lang ?? lang;
+  // A voice the browser won't take (it changed under us) still leaves the language set.
+  if (v) { try { u.voice = v; } catch { /* the language picks one */ } }
+  const rate = Math.min(2, Math.max(0.5, opts.rate ?? 1));
+  u.rate = rate;
   u.pitch = Math.min(2, Math.max(0, opts.pitch ?? 1));
 
-  speechSynthesis.cancel();
+  hush();   // whatever she was saying is cut off, and reported as cancelled
   return new Promise((resolve) => {
-    u.onend = () => resolve("done");
-    u.onerror = (e) => resolve(e.error === "canceled" || e.error === "interrupted" ? "cancelled" : "failed");
-    speechSynthesis.speak(u);
+    let settled = false;
+    // Safari sometimes never fires "end" for a long sentence: give up waiting after about
+    // twice the time it should take, and call it done.
+    const guard = setTimeout(() => settle("done"), 3000 + (words.length * 140) / rate);
+    const me = { settle };
+    function settle(r: SpeakResult) {
+      if (settled) return;
+      settled = true; clearTimeout(guard);
+      if (current === me) current = null;
+      resolve(r);
+    }
+    current = me;
+    // Browsers disagree on what a cancel looks like (an "end", or an "interrupted" error);
+    // hush() settles first, so either way the answer is "cancelled".
+    u.onend = () => settle("done");
+    u.onerror = (e) => settle(e.error === "canceled" || e.error === "interrupted" ? "cancelled" : "failed");
+    try { speechSynthesis.speak(u); } catch { settle("failed"); }
   });
 }
 
-/** Stop talking now. */
+/** Stop talking now. A speak() in progress resolves "cancelled". Safe to call any time. */
 export function hush(): void {
+  if (current) current.settle("cancelled");
   if (canSpeak()) speechSynthesis.cancel();
 }
 
+/** Is she talking right now? */
+export const speaking = (): boolean => current !== null;
+
 /** Dixie, as one object: `dixie.speak("Hi")`, `dixie.hush()`. */
-export const dixie = { speak, hush, canSpeak, loadVoices, chooseVoice };
+export const dixie = { speak, hush, speaking, primeVoices, canSpeak, loadVoices, chooseVoice };

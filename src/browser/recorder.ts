@@ -2,6 +2,10 @@
 // person stops talking (or when the app says so). Nothing is uploaded here: the app gets the
 // audio back and decides where it goes (normally its own server, which hands it to whisper).
 import { SilenceDetector, rms, type SilenceOptions, type StopReason, type ListenState } from "./silence.js";
+import { hush } from "./dixie.js";
+
+/** Tuned for a spoken answer: up to a minute, ended by 1.5 s of quiet, given up after 8 s of nothing. */
+export const ANSWER_DEFAULTS = { maxMs: 60_000, silenceMs: 1500, noSpeechMs: 8000 } as const;
 
 export type RecordingResult =
   | { ok: true; audio: Blob; type: string; ms: number; reason: StopReason | "stopped" }
@@ -20,6 +24,8 @@ export interface RecordOptions extends SilenceOptions {
   onLevel?: (level: number) => void;
   /** When it starts hearing speech, and when it's waiting for more. */
   onState?: (state: ListenState) => void;
+  /** Stop Dixie talking first (so a tap on the mic interrupts her). Default true. */
+  hushDixie?: boolean;
 }
 
 export interface Recording {
@@ -51,6 +57,7 @@ function failure(code: RecordErrorCode, error: string): RecordingResult { return
  * does something.
  */
 export function record(opts: RecordOptions = {}): Recording {
+  if (opts.hushDixie !== false) hush();
   let finish: (r: RecordingResult) => void = () => {};
   const done = new Promise<RecordingResult>((resolve) => { finish = resolve; });
   let stopReason: StopReason | "stopped" | "cancelled" | null = null;
@@ -86,7 +93,7 @@ export function record(opts: RecordOptions = {}): Recording {
     analyser.fftSize = 1024;
     source.connect(analyser);
     const frame = new Float32Array(analyser.fftSize);
-    const detector = new SilenceDetector(opts);
+    const detector = new SilenceDetector({ ...ANSWER_DEFAULTS, ...opts });
     let lastState: ListenState = detector.state;
 
     const timer = setInterval(() => {

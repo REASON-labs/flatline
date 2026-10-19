@@ -14,6 +14,9 @@
 #   FLATLINE_PORT         loopback port (default 8086)
 #   FLATLINE_THREADS      CPU threads (default: all)
 #   FLATLINE_MEMORY_MAX   systemd memory cap (default 2G)
+#   FLATLINE_MODEL_FROM   a folder that already has ggml-<model>.bin: copied instead of downloaded
+#   FLATLINE_START        0 = install and enable, but don't start (another service holds the port;
+#                         see server/migrate-from-whisper.sh)
 set -euo pipefail
 [ "$(id -u)" = 0 ] || { echo "Run with sudo." >&2; exit 1; }
 
@@ -23,6 +26,8 @@ LANGUAGE="${FLATLINE_LANGUAGE:-en}"
 PORT="${FLATLINE_PORT:-8086}"
 THREADS="${FLATLINE_THREADS:-$(nproc)}"
 MEMORY_MAX="${FLATLINE_MEMORY_MAX:-2G}"
+MODEL_FROM="${FLATLINE_MODEL_FROM:-}"
+START="${FLATLINE_START:-1}"
 SERVICE=flatline-whisper
 USER_NAME=flatline
 HOME_DIR=/var/lib/flatline
@@ -59,6 +64,11 @@ install -m 0755 "$BIN" "$PREFIX/bin/whisper-server"
 find "$SRC/build" -name "*.so*" -exec cp -a {} "$PREFIX/bin/" \; 2>/dev/null || true
 
 MODEL_FILE="$HOME_DIR/ggml-$MODEL.bin"
+if [ ! -s "$MODEL_FILE" ] && [ -n "$MODEL_FROM" ] && [ -s "$MODEL_FROM/ggml-$MODEL.bin" ]; then
+  echo "Copying the $MODEL model from $MODEL_FROM..."
+  cp "$MODEL_FROM/ggml-$MODEL.bin" "$MODEL_FILE.part" && mv "$MODEL_FILE.part" "$MODEL_FILE"
+  chown "$USER_NAME:$USER_NAME" "$MODEL_FILE"
+fi
 if [ ! -s "$MODEL_FILE" ]; then
   echo "Downloading the $MODEL model..."
   bash "$SRC/models/download-ggml-model.sh" "$MODEL" "$HOME_DIR" >/dev/null
@@ -95,6 +105,11 @@ MemoryMax=$MEMORY_MAX
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
+if [ "$START" = 0 ]; then
+  systemctl enable -q "$SERVICE"
+  echo "Installed and enabled $SERVICE (not started). Start it with: systemctl start $SERVICE"
+  exit 0
+fi
 systemctl enable -q --now "$SERVICE"
 systemctl restart "$SERVICE"
 

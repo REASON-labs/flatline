@@ -13,11 +13,18 @@ if (!canRecord()) showTypingInstead();
 const rec = record({
   silenceMs: 1500,   // quiet this long after speaking ends it
   noSpeechMs: 8000,  // nothing said this long from the start: give up
-  maxMs: 120000,     // hard limit
+  maxMs: 60000,      // hard limit
   onLevel: (l) => {},  // 0..1, ~20 times a second, for a meter
   onState: (s) => {},  // "waiting" -> "speaking" <-> "trailing"
+  hushDixie: true,     // stop Dixie first (default), so a tap on the mic interrupts her
 });
-const r = await rec.done;
+```
+
+The defaults (`ANSWER_DEFAULTS`) suit a spoken answer: 60 s at most, 1.5 s of quiet ends it,
+8 s of nothing gives up. Every option is optional:
+
+```js
+const r = await record().done;   // or rec.done, from above
 ```
 
 `r` is either `{ ok: true, audio, type, ms, reason }`, where `reason` is `"silence"`, `"max"` or
@@ -60,9 +67,16 @@ It POSTs the audio as the raw body with its content type, and expects `{ text }`
 
 ```js
 import { dixie } from "flatline/browser";
+dixie.primeVoices();                                      // once, early (see iPhone notes)
 await dixie.speak("When does your day usually start?");   // resolves when it's been said
-dixie.hush();                                             // stop now
+dixie.hush();                                             // stop now: speak resolves "cancelled"
+dixie.speaking();                                         // is she talking?
 ```
+
+A new `speak()` cuts off the one before (which resolves `"cancelled"`), and `record()` hushes her
+unless told not to. Browsers disagree on how a cancel is reported; Dixie always says
+`"cancelled"`. If a browser never reports the end of a sentence (Safari, now and then), `speak()`
+resolves `"done"` after about twice the time it should have taken.
 
 Options: `lang` (default: the page's language), `voice` (a name the phone lists), `rate` (0.5 to
 2), `pitch`. Dixie picks the best voice for the language: the exact language first, then the
@@ -74,8 +88,10 @@ on-device before network voices, and never the novelty voices some systems ship.
 
 ## iPhone notes
 
-- The first `speak()` must come from a tap. After that, it can follow on from a recording.
-- iOS's voices arrive a moment after the page loads; `speak()` waits for them briefly.
+- The first `speak()` must come from a tap, with nothing awaited in between. `speak()` therefore
+  starts at once with the voices already loaded: call `primeVoices()` early (on page load) so the
+  better voice is there by the first question. Without it, the phone's default voice for the
+  language is used.
 - Better voices can be downloaded in Settings → Accessibility → Spoken Content → Voices; Dixie
   picks them up automatically.
-- Speaking and recording at once doesn't work well: wait for `speak()` to finish, then `record()`.
+- Speaking and recording at once doesn't work well; `record()` stops Dixie first for that reason.
