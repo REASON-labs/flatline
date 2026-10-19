@@ -6,8 +6,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -23,10 +23,11 @@ jobs:
   # The installer for real (systemd, the pinned whisper.cpp, the tiny model), then real speech in
   # the formats phones record.
   whisper:
-    runs-on: ubuntu-latest
+    # The Ubuntu the live servers run: the installer must work there.
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm

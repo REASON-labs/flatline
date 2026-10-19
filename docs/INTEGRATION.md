@@ -8,7 +8,7 @@ reachable from outside the server.
 
 ```jsonc
 // package.json: once the repository is public, or wherever your server can read it
-"dependencies": { "flatline": "github:REASON-labs/flatline#v0.1.1" }
+"dependencies": { "flatline": "github:REASON-labs/flatline#v0.1.2" }
 ```
 
 The built code is committed, so installing needs no build step and no dev tools. Pin a tag.
@@ -18,7 +18,7 @@ release's tarball instead (it's attached to each GitHub release, or made with `n
 in your repository:
 
 ```jsonc
-"dependencies": { "flatline": "file:vendor/flatline-0.1.1.tgz" }
+"dependencies": { "flatline": "file:vendor/flatline-0.1.2.tgz" }
 ```
 
 and make sure your deploy copies `vendor/` to the server before `npm ci`.

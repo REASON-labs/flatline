@@ -52,6 +52,13 @@ export function canRecord(): boolean {
 
 function failure(code: RecordErrorCode, error: string): RecordingResult { return { ok: false, code, error }; }
 
+/** An AudioContext (older iPhones only have the webkit-prefixed one), or null. */
+function newAudioContext(): AudioContext | null {
+  const AC = (globalThis as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext
+    ?? (globalThis as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  try { return AC ? new AC() : null; } catch { return null; }
+}
+
 /**
  * Start recording. Call it from a tap: browsers only allow the mic (and audio) after the person
  * does something.
@@ -70,45 +77,70 @@ export function record(opts: RecordOptions = {}): Recording {
     if (recorder && recorder.state !== "inactive") recorder.stop(); else cleanup();
   };
 
+  // The loudness meter's audio context is made NOW, inside the tap: on iPhone, one made after
+  // a wait (the mic prompt) starts suspended and hears nothing.
+  const ctx = canRecord() ? newAudioContext() : null;
+  void ctx?.resume().catch(() => {});
+  const closeCtx = () => { void ctx?.close().catch(() => {}); };
+
   void (async () => {
     if (!canRecord()) { finish(failure("unsupported", "This browser can't record here (it needs a secure page and a microphone).")); return; }
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     } catch (e) {
+      closeCtx();
       const name = (e as { name?: string })?.name;
       if (name === "NotAllowedError" || name === "SecurityError") finish(failure("denied", "Microphone access wasn't allowed."));
       else if (name === "NotFoundError" || name === "OverconstrainedError") finish(failure("no_mic", "No microphone was found."));
       else finish(failure("failed", `The microphone didn't start (${String((e as Error)?.message ?? e)}).`));
       return;
     }
-    if (stopReason === "cancelled") { stream.getTracks().forEach((t) => t.stop()); finish(failure("cancelled", "Cancelled.")); return; }
+    if (stopReason === "cancelled") { stream.getTracks().forEach((t) => t.stop()); closeCtx(); finish(failure("cancelled", "Cancelled.")); return; }
 
     const type = pickMimeType((t) => MediaRecorder.isTypeSupported(t));
     const chunks: Blob[] = [];
     const started = performance.now();
-    const ctx = new AudioContext();
-    const source = ctx.createMediaStreamSource(stream);
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 1024;
-    source.connect(analyser);
-    const frame = new Float32Array(analyser.fftSize);
-    const detector = new SilenceDetector({ ...ANSWER_DEFAULTS, ...opts });
+    await ctx?.resume().catch(() => {});
+    let analyser: AnalyserNode | null = null;
+    try {
+      if (ctx) { analyser = ctx.createAnalyser(); analyser.fftSize = 1024; ctx.createMediaStreamSource(stream).connect(analyser); }
+    } catch { analyser = null; }
+    const frame = new Float32Array(analyser?.fftSize ?? 1024);
+    const settings = { ...ANSWER_DEFAULTS, ...opts };
+    const detector = new SilenceDetector(settings);
     let lastState: ListenState = detector.state;
+    // If the meter hears pure silence for a while (no meter at all, or a context the browser
+    // never let run), it can't tell when someone stops: keep recording until stop() or maxMs,
+    // rather than giving up on a person who is talking.
+    let heardSignal = false;
+    let deaf = !analyser;
 
     const timer = setInterval(() => {
-      analyser.getFloatTimeDomainData(frame);
-      const level = rms(frame);
-      opts.onLevel?.(level);
-      const why = detector.feed(level, performance.now());
-      if (detector.state !== lastState) { lastState = detector.state; opts.onState?.(lastState); }
-      if (why) end(why);
+      const now = performance.now();
+      if (!deaf && analyser) {
+        analyser.getFloatTimeDomainData(frame);
+        const level = rms(frame);
+        if (level > 0) heardSignal = true;
+        else if (!heardSignal && now - started > 1500) deaf = true;
+        if (!deaf) {
+          opts.onLevel?.(level);
+          const why = detector.feed(level, now);
+          if (detector.state !== lastState) { lastState = detector.state; opts.onState?.(lastState); }
+          // "Nothing said" needs a meter that hears something: a real mic always picks up a
+          // little background. Pure zeros mean the meter is deaf, not that the room is silent.
+          if (why === "no_speech" && !heardSignal) deaf = true;
+          else if (why) { end(why); return; }
+          if (!deaf) return;
+        }
+      }
+      if (now - started >= settings.maxMs) end("max");
     }, 50);
 
     cleanup = () => {
       clearInterval(timer);
       stream.getTracks().forEach((t) => t.stop());
-      void ctx.close().catch(() => {});
+      closeCtx();
     };
 
     try {

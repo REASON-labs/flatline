@@ -95,3 +95,44 @@ test('no microphone API at all (old browser, or not https): "unsupported"', asyn
   assert.equal(r.can, false);
   assert.deepEqual([r.out.ok, r.out.code], [false, "unsupported"]);
 });
+
+// iPhone: an audio context made after the mic prompt starts suspended and hears nothing.
+test("the loudness meter is set up inside the tap, before the mic is asked for", async () => {
+  const p = await page(() => {
+    window.__order = [];
+    const AC = window.AudioContext;
+    window.AudioContext = class extends AC { constructor(...a) { super(...a); window.__order.push("audio"); } };
+    const gum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = (c) => { window.__order.push("mic"); return gum(c); };
+  });
+  const order = await p.evaluate(async () => {
+    const { record } = await import("/dist/browser/index.js");
+    const rec = record(); await new Promise((x) => setTimeout(x, 500)); rec.cancel(); await rec.done;
+    return window.__order;
+  });
+  assert.deepEqual(order.slice(0, 2), ["audio", "mic"]);
+});
+
+test("a meter that hears only silence keeps recording (to stop() or maxMs), not \"nothing said\"", { timeout: 60_000 }, async () => {
+  const p = await page(() => { AnalyserNode.prototype.getFloatTimeDomainData = function (a) { a.fill(0); }; });
+  const r = await p.evaluate(async () => {
+    const { record } = await import("/dist/browser/index.js");
+    const out = await record({ noSpeechMs: 1000, maxMs: 3500 }).done;
+    return { ok: out.ok, reason: out.reason, code: out.code, ms: out.ms, size: out.ok ? out.audio.size : 0 };
+  });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.reason, "max");
+  assert.ok(r.ms >= 3400 && r.size > 0, JSON.stringify(r));
+});
+
+test("no Web Audio at all: it still records, and stop() keeps it", { timeout: 60_000 }, async () => {
+  const p = await page(() => { delete window.AudioContext; delete window.webkitAudioContext; });
+  const r = await p.evaluate(async () => {
+    const { record } = await import("/dist/browser/index.js");
+    const rec = record(); await new Promise((x) => setTimeout(x, 800)); rec.stop();
+    const out = await rec.done;
+    return { ok: out.ok, reason: out.reason, size: out.ok ? out.audio.size : 0 };
+  });
+  assert.deepEqual([r.ok, r.reason], [true, "stopped"]);
+  assert.ok(r.size > 0);
+});
