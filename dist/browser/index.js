@@ -2,6 +2,6 @@
 // Dixie, who reads text aloud.
 export { record, canRecord, pickMimeType, ANSWER_DEFAULTS } from "./recorder.js";
 export { SilenceDetector, rms } from "./silence.js";
-export { dixie, speak, hush, speaking, primeVoices, canSpeak, loadVoices, chooseVoice } from "./dixie.js";
+export { dixie, speak, hush, speaking, configure, primeVoices, canSpeak, loadVoices, chooseVoice } from "./dixie.js";
 export { transcribeOnServer } from "./upload.js";
 //# sourceMappingURL=index.js.map

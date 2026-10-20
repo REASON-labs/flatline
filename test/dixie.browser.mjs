@@ -116,3 +116,129 @@ test("empty text is done at once; no speech in the browser is \"unavailable\"", 
   });
   assert.deepEqual(r, ["done", "unavailable", false]);
 });
+
+// --- her own voice, from a server endpoint -----------------------------------------------------
+
+import { wav } from "./helpers.mjs";
+
+/** A stand-in voice endpoint: audio of `seconds`, after `delay` ms, or an error status. */
+function voiceRoutes(log) {
+  const audio = (seconds) => wav([[seconds, 0.3]]);
+  const reply = (status, seconds, delay = 0) => async (req, res) => {
+    let body = ""; for await (const c of req) body += c;
+    log.push({ path: req.url, body: JSON.parse(body || "{}"), session: req.headers["x-session"] ?? null });
+    setTimeout(() => {
+      if (status !== 200) { res.writeHead(status, { "content-type": "application/json" }); res.end('{"error":"no"}'); return; }
+      res.writeHead(200, { "content-type": "audio/wav" }); res.end(audio(seconds));
+    }, delay);
+  };
+  return {
+    "POST /speak": reply(200, 0.6),
+    "POST /speak-long": reply(200, 5),
+    "POST /speak-slow": reply(200, 0.5, 3000),
+    "POST /speak-down": reply(503, 0),
+  };
+}
+
+let voiceSite;
+const voiceLog = [];
+before(async () => { voiceSite = await serve(voiceRoutes(voiceLog)); });
+after(() => voiceSite?.close());
+
+async function voicePage() {
+  const p = await context.newPage();
+  await p.addInitScript(fakeSpeech, 200);
+  await p.goto(voiceSite.url);
+  return p;
+}
+
+test("with an endpoint, she plays the server's voice and resolves when it ends", { timeout: 30_000 }, async () => {
+  voiceLog.length = 0;
+  const p = await voicePage();
+  const r = await p.evaluate(async () => {
+    const { dixie } = await import("/dist/browser/index.js");
+    dixie.configure({ endpoint: "/speak", headers: { "x-session": "s1" } });
+    const t = performance.now();
+    const out = await dixie.speak("Listen to me.");
+    return { out, ms: performance.now() - t, phoneSaid: window.__speech.said.length };
+  });
+  assert.equal(r.out, "done");
+  assert.ok(r.ms >= 550, `resolved after ${r.ms} ms`);
+  assert.equal(r.phoneSaid, 0, "the phone's voice wasn't used");
+  assert.deepEqual(voiceLog[0], { path: "/speak", body: { text: "Listen to me.", preset: "dixie", format: "mp3" }, session: "s1" });
+});
+
+test("hush() stops the server's voice mid-sentence: \"cancelled\", and the player stops", { timeout: 30_000 }, async () => {
+  const p = await voicePage();
+  const r = await p.evaluate(async () => {
+    const { dixie } = await import("/dist/browser/index.js");
+    dixie.configure({ endpoint: "/speak-long" });
+    const pr = dixie.speak("A long one.");
+    await new Promise((x) => setTimeout(x, 1200));
+    dixie.hush();
+    return { out: await pr, speaking: dixie.speaking() };
+  });
+  assert.deepEqual([r.out, r.speaking], ["cancelled", false]);
+});
+
+test("record() stops her too, even while the audio is still on its way", { timeout: 30_000 }, async () => {
+  const p = await voicePage();
+  const r = await p.evaluate(async () => {
+    const { dixie, record } = await import("/dist/browser/index.js");
+    dixie.configure({ endpoint: "/speak-slow" });
+    const pr = dixie.speak("Slow to arrive.");
+    await new Promise((x) => setTimeout(x, 300));
+    const rec = record();
+    const out = await pr;
+    rec.cancel();
+    return { out, phoneSaid: window.__speech.said.length };
+  });
+  assert.deepEqual(r, { out: "cancelled", phoneSaid: 0 });
+});
+
+test("a newer sentence cuts off the server's voice", { timeout: 30_000 }, async () => {
+  const p = await voicePage();
+  const r = await p.evaluate(async () => {
+    const { dixie } = await import("/dist/browser/index.js");
+    dixie.configure({ endpoint: "/speak-long" });
+    const first = dixie.speak("One.");
+    await new Promise((x) => setTimeout(x, 500));
+    const second = dixie.speak("Two.", { endpoint: "/speak" });
+    return [await first, await second];
+  });
+  assert.deepEqual(r, ["cancelled", "done"]);
+});
+
+test("the server can't speak (an error, or it's down): the phone's voice says it instead", { timeout: 30_000 }, async () => {
+  const p = await voicePage();
+  const r = await p.evaluate(async () => {
+    const { dixie } = await import("/dist/browser/index.js");
+    const a = await dixie.speak("From the phone.", { endpoint: "/speak-down" });
+    const b = await dixie.speak("Also the phone.", { endpoint: "http://127.0.0.1:9/speak" });
+    return { a, b, said: window.__speech.said.map((s) => s.text) };
+  });
+  assert.deepEqual(r, { a: "done", b: "done", said: ["From the phone.", "Also the phone."] });
+});
+
+test("too slow: after timeoutMs the phone's voice takes over", { timeout: 30_000 }, async () => {
+  const p = await voicePage();
+  const r = await p.evaluate(async () => {
+    const { dixie } = await import("/dist/browser/index.js");
+    const t = performance.now();
+    const out = await dixie.speak("Hurry.", { endpoint: "/speak-slow", timeoutMs: 800 });
+    return { out, ms: performance.now() - t, said: window.__speech.said.map((s) => s.text) };
+  });
+  assert.equal(r.out, "done");
+  assert.deepEqual(r.said, ["Hurry."]);
+  assert.ok(r.ms < 2500, `${r.ms} ms`);
+});
+
+test("endpoint: null uses the phone's voice even when configured", async () => {
+  const p = await voicePage();
+  const r = await p.evaluate(async () => {
+    const { dixie } = await import("/dist/browser/index.js");
+    dixie.configure({ endpoint: "/speak" });
+    return { out: await dixie.speak("Local.", { endpoint: null }), said: window.__speech.said.length };
+  });
+  assert.deepEqual(r, { out: "done", said: 1 });
+});

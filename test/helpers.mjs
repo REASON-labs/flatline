@@ -25,10 +25,15 @@ export function wav(segments, rate = 16000) {
   return buf;
 }
 
-/** Serve the repository (so pages can import /dist/browser/index.js); "/" is an empty page. */
-export async function serve() {
+/**
+ * Serve the repository (so pages can import /dist/browser/index.js); "/" is an empty page.
+ * `routes` handles anything else first: { "POST /speak": (req, res) => {...} }.
+ */
+export async function serve(routes = {}) {
   const server = createServer(async (req, res) => {
     const path = req.url.split("?")[0];
+    const route = routes[`${req.method} ${path}`];
+    if (route) return route(req, res);
     try {
       const body = path === "/" ? '<!doctype html><meta charset="utf-8"><title>flatline</title>' : await readFile(join(ROOT, path));
       res.writeHead(200, { "content-type": path === "/" ? "text/html" : TYPES[extname(path)] ?? "application/octet-stream" });

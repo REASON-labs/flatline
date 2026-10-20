@@ -79,3 +79,39 @@ jobs:
           curl -fsS -o /dev/null http://127.0.0.1:8086/
       - if: failure()
         run: sudo journalctl -u flatline-whisper -n 80 --no-pager
+
+  # Dixie's voice for real: Piper and ffmpeg on the live servers' Ubuntu, every format, her words
+  # understood through whisper, and the voice lab (ranked candidates and samples to listen to).
+  voice:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: sudo FLATLINE_MODEL=base.en bash server/install.sh
+      - run: sudo FLATLINE_VOICE_EXTRA="en_US-bryce-medium en_US-john-medium en_US-norman-medium en_US-joe-medium en_US-mike-medium" bash server/install-voice.sh
+      - run: npm run test:voice
+        env:
+          FLATLINE_VOICE_URL: http://127.0.0.1:8087
+          FLATLINE_URL: http://127.0.0.1:8086
+      - name: Re-running the voice installer is safe (and keeps edited presets)
+        run: |
+          echo '{"dixie":{"voice":"en_US-libritts_r-medium","effects":{}},"plain":{"voice":"en_US-libritts_r-medium","effects":{}},"mine":{"voice":"en_US-libritts_r-medium","effects":{}}}' | sudo tee /etc/flatline/voice-presets.json >/dev/null
+          sudo bash server/install-voice.sh
+          curl -fsS http://127.0.0.1:8087/ | grep -q '"mine"'
+          sudo FLATLINE_VOICE_RESET_PRESETS=1 bash server/install-voice.sh
+          ! curl -fsS http://127.0.0.1:8087/ | grep -q '"mine"'
+      - name: Voice lab
+        run: sudo env PIPER_BIN=/opt/flatline/piper/piper FLATLINE_VOICES_DIR=/var/lib/flatline/voices FLATLINE_URL=http://127.0.0.1:8086 LD_LIBRARY_PATH=/opt/flatline/piper node tools/voice-lab.mjs voice-lab && sudo chown -R "$USER" voice-lab
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voice-lab
+          path: |
+            voice-lab/report.md
+            voice-lab/report.json
+            voice-lab/samples/
+      - if: failure()
+        run: sudo journalctl -u flatline-voice -n 80 --no-pager
