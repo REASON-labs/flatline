@@ -40,7 +40,7 @@ const LINES = [
   ["Take your meds and drink some water. Then check in before noon.", ["meds", "water", "check", "noon"]],
   ["Listen up. You have three things to do today, and the first one is already late.", ["listen", "three", "today", "first", "late"]],
   ["Good. That's one done. Now get some sleep, and we'll talk in the morning.", ["good", "done", "sleep", "talk", "morning"]],
-  ["Your appointment is at four o'clock. Leave by three thirty.", ["appointment", "four", "leave", "three", "thirty"]],
+  ["Your appointment is at four o'clock. Leave by three thirty.", ["appointment", "four|4", "leave", "three|3", "thirty|30"]],
 ];
 test("Dixie is understood: at least 80% of the key words survive the sound (through whisper)", { skip: skip || (!sttUrl && "set FLATLINE_URL"), timeout: 300_000 }, async () => {
   let got = 0, total = 0;
@@ -51,7 +51,8 @@ test("Dixie is understood: at least 80% of the key words survive the sound (thro
     const t = await createTranscriber({ url: sttUrl }).transcribe(r.audio, r.contentType);
     assert.equal(t.ok, true, JSON.stringify(t));
     const said = t.text.toLowerCase();
-    for (const k of keys) { total++; if (said.includes(k)) got++; else misses.push(`"${k}" (heard: ${t.text})`); }
+    // A key may list spellings ("four|4"): whisper writes numbers as digits.
+    for (const k of keys) { total++; if (k.split("|").some((w) => said.includes(w))) got++; else misses.push(`"${k}" (heard: ${t.text})`); }
   }
   console.log(`# key words heard: ${got}/${total}${misses.length ? `; missed ${misses.join("; ")}` : ""}`);
   assert.ok(got / total >= 0.8, `only ${got}/${total}: ${misses.join("; ")}`);
