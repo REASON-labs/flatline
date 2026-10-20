@@ -2,7 +2,7 @@
   "dixie": {
     "about": "Dixie Flatline: deep, slow and deliberate, gritty, a voice down a line. Tune freely; keep it clear on a phone speaker.",
     "voice": "en_US-libritts_r-medium",
-    "speaker": 0,
+    "speaker": 137,
     "lengthScale": 1.15,
     "noiseScale": 0.55,
     "noiseW": 0.7,
@@ -21,7 +21,7 @@
   "plain": {
     "about": "The same voice with no effects: for comparing, or when the character isn't wanted.",
     "voice": "en_US-libritts_r-medium",
-    "speaker": 0,
+    "speaker": 137,
     "lengthScale": 1.0,
     "noiseScale": 0.667,
     "noiseW": 0.8,

@@ -8,7 +8,7 @@ reachable from outside the server.
 
 ```jsonc
 // package.json: once the repository is public, or wherever your server can read it
-"dependencies": { "flatline": "github:REASON-labs/flatline#v0.1.2" }
+"dependencies": { "flatline": "github:REASON-labs/flatline#v0.2.0" }
 ```
 
 The built code is committed, so installing needs no build step and no dev tools. Pin a tag.
@@ -18,7 +18,7 @@ release's tarball instead (it's attached to each GitHub release, or made with `n
 in your repository:
 
 ```jsonc
-"dependencies": { "flatline": "file:vendor/flatline-0.1.2.tgz" }
+"dependencies": { "flatline": "file:vendor/flatline-0.2.0.tgz" }
 ```
 
 and make sure your deploy copies `vendor/` to the server before `npm ci`.
@@ -116,6 +116,42 @@ always work: voice is a way to fill the box, not the only way.
 
 Speech that reads questions aloud should be something the person turns on (a speaker button,
 remembered on the device), not a surprise in a quiet room.
+
+## Dixie's voice (text to speech)
+
+The same shape the other way round: the page asks your endpoint to speak, your endpoint checks
+the session and asks flatline-voice, and the audio comes back.
+
+```
+POST /api/voice/speak
+  headers: your session, content-type: application/json
+  body:    { "text": "…", "preset": "dixie", "format": "mp3" }
+→ 200 audio (the content type of the format)
+→ 4xx/5xx { "error": "…" }
+```
+
+```js
+import { createSpeaker } from "flatline/server";
+const voice = createSpeaker({ url: process.env.FLATLINE_VOICE_URL, maxChars: 600 }); // http://127.0.0.1:8087
+
+app.post("/api/voice/speak", async (c) => {
+  if (!c.get("actor")) return c.json({ error: "Not signed in." }, 401);
+  if (rateLimited(`speak:${c.get("actor").id}`, 60, 10 * 60_000)) return c.json({ error: "Slow down." }, 429);
+  const { text, preset, format } = await c.req.json();
+  const r = await voice.speak(text, { preset: preset === "plain" ? "plain" : "dixie", format: format === "m4a" ? "m4a" : "mp3" });
+  if (!r.ok) return c.json({ error: r.error }, r.code === "busy" ? 503 : r.code === "unavailable" ? 503 : 400);
+  return c.body(r.audio, 200, { "content-type": r.contentType, "cache-control": "no-store" });
+});
+```
+
+On the page, once: `dixie.configure({ endpoint: "/api/voice/speak" })`. Then `dixie.speak(q)`
+uses her voice (MP3 plays everywhere, including iPhone Safari), resolves `"done"` or `"cancelled"`
+as before, and falls back to the phone's voice if the endpoint fails or takes over 15 s. For a
+voice memo (Signal), ask for `format: "m4a"` server-side and send the bytes as an attachment.
+
+Only let the page choose among presets you allow, and cap the text: anyone signed in can make
+the CPU talk. The default voice is CC BY 4.0: credit it somewhere in your app (an "About" or
+"Credits" line): "Voice: Piper en_US-libritts_r, trained on LibriTTS-R (CC BY 4.0)".
 
 ## Tests in your app
 

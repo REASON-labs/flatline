@@ -1,7 +1,7 @@
 {
   "name": "flatline",
-  "version": "0.1.2",
-  "description": "Self-hosted voice for web apps: speech-to-text on your own server (whisper.cpp), recording that stops on silence, and Dixie, a voice that reads text aloud. The audio never leaves your box.",
+  "version": "0.2.0",
+  "description": "Self-hosted voice for web apps: speech-to-text (whisper.cpp) and text-to-speech (Piper) on your own server, recording that stops on silence, and Dixie, a voice that reads text aloud. The audio never leaves your box.",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -33,14 +33,17 @@
     "test:voice": "npm run build && node --test test/voice.integration.mjs"
   },
   "keywords": [
-    "speech-to-text",
-    "whisper",
-    "whisper.cpp",
-    "voice",
-    "self-hosted",
-    "privacy",
     "mediarecorder",
-    "speechsynthesis"
+    "piper",
+    "privacy",
+    "self-hosted",
+    "speech-to-text",
+    "speechsynthesis",
+    "text-to-speech",
+    "tts",
+    "voice",
+    "whisper",
+    "whisper.cpp"
   ],
   "devDependencies": {
     "@types/node": "^22.10.0",

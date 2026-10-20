@@ -3,15 +3,17 @@
 Self-hosted voice for web apps. Someone talks to your app on their phone; your own server turns
 it into text; your app can answer out loud. **The audio never leaves your machine.**
 
-Three small pieces, no runtime dependencies:
+Small pieces, no runtime dependencies:
 
 | Piece | Runs | Does |
 |---|---|---|
 | **Speech-to-text service** (`server/install.sh`) | your server | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) at a pinned release, as a hardened systemd service on loopback |
 | **`flatline/server`** | your app's backend (Node 20+) | sends audio to that service and returns clean text, with time and size limits and plain error codes |
-| **`flatline/browser`** | the phone's browser | records an answer and **stops by itself when the person stops talking**; sends it to your backend; and **Dixie**, a voice that reads text aloud using the phone's own speech |
+| **Text-to-speech service** (`server/install-voice.sh`) | your server | [Piper](https://github.com/rhasspy/piper) at a pinned release, with presets that give the voice its sound through ffmpeg; the **dixie** preset is a rugged, deep "voice in the machine" |
+| **`flatline/browser`** | the phone's browser | records an answer and **stops by itself when the person stops talking**; sends it to your backend; and **Dixie**, who reads text aloud with the server's voice, or the phone's own when that isn't available |
 
 Named for the Dixie Flatline in *Neuromancer*: a voice in the machine that talks back.
+`flatline/server` also has `createSpeaker()`, for the voice: text in, M4A/MP3/Ogg/WAV out.
 
 ## How it fits together
 
@@ -29,12 +31,12 @@ Whisper listens on loopback only.
 ## Install
 
 ```jsonc
-"dependencies": { "flatline": "github:REASON-labs/flatline#v0.1.2" }
+"dependencies": { "flatline": "github:REASON-labs/flatline#v0.2.0" }
 ```
 
 The built code is committed, so installing needs no build and no dev tools; pin a tag. A server
 that can't read the repository can use the tarball attached to each release instead
-(`"flatline": "file:vendor/flatline-0.1.2.tgz"`). See [docs/INTEGRATION.md](docs/INTEGRATION.md).
+(`"flatline": "file:vendor/flatline-0.2.0.tgz"`). See [docs/INTEGRATION.md](docs/INTEGRATION.md).
 
 ## Quick start
 
@@ -62,6 +64,7 @@ else reply({ error: r.error }, r.code === "unavailable" ? 503 : 400);
 ```
 
 A complete minimal server is in [examples/node-server.mjs](examples/node-server.mjs).
+For Dixie's voice, see [docs/VOICE.md](docs/VOICE.md): install it, tune the preset, and the licences.
 
 **3. The page** (call it from a tap: browsers allow the mic and speech only after one):
 
@@ -112,5 +115,7 @@ The API may still change before 1.0.
 
 ## License
 
-[MIT](LICENSE). whisper.cpp, which the service builds, is MIT too; the models it downloads are
-OpenAI's Whisper models (MIT).
+[MIT](LICENSE). whisper.cpp, which the speech-to-text service builds, is MIT too; the models it
+downloads are OpenAI's Whisper models (MIT). The voice service runs Piper (MIT, which bundles
+espeak-ng, GPL-3.0, in its own process) and a voice trained on LibriTTS-R (CC BY 4.0: credit it).
+Details in [docs/VOICE.md](docs/VOICE.md#licences).
