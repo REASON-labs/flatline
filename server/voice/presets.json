@@ -1,20 +1,29 @@
 {
   "dixie": {
-    "about": "Dixie Flatline: deep, slow and deliberate, gritty, a voice down a line. Tune freely; keep it clear on a phone speaker.",
+    "about": "Dixie Flatline: deep, slow and deliberate, flat and level (little upward inflection), gritty, a voice down a line. Tuned by ear on 2026-10-20. Keep it clear on a phone speaker.",
     "voice": "en_US-libritts_r-medium",
     "speaker": 137,
-    "lengthScale": 1.15,
-    "noiseScale": 0.55,
-    "noiseW": 0.7,
-    "sentenceSilence": 0.4,
+    "lengthScale": 1.3,
+    "noiseScale": 0.35,
+    "noiseW": 0.5,
+    "sentenceSilence": 0.55,
     "effects": {
       "pitch": 0.9,
       "highpass": 110,
       "lowpass": 5200,
-      "presence": { "freq": 1900, "gain": 3 },
-      "compress": { "threshold": -22, "ratio": 4 },
+      "presence": {
+        "freq": 1900,
+        "gain": 3
+      },
+      "compress": {
+        "threshold": -22,
+        "ratio": 4
+      },
       "drive": 6,
-      "echo": { "delay": 16, "decay": 0.15 },
+      "echo": {
+        "delay": 16,
+        "decay": 0.15
+      },
       "loudness": -16
     }
   },
@@ -26,6 +35,8 @@
     "noiseScale": 0.667,
     "noiseW": 0.8,
     "sentenceSilence": 0.25,
-    "effects": { "loudness": -16 }
+    "effects": {
+      "loudness": -16
+    }
   }
 }

@@ -80,9 +80,10 @@ Presets live in `/etc/flatline/voice-presets.json` (the shipped ones are in
 "dixie": {
   "voice": "en_US-libritts_r-medium",  // a Piper voice in /var/lib/flatline/voices
   "speaker": 137,                      // for multi-speaker voices: which speaker
-  "lengthScale": 1.15,                 // > 1 is slower, more deliberate
-  "noiseScale": 0.55, "noiseW": 0.7,   // lower is steadier, flatter delivery
-  "sentenceSilence": 0.4,              // seconds of pause between sentences
+  "lengthScale": 1.3,                  // > 1 is slower, more deliberate
+  "noiseScale": 0.35,                  // lower is flatter, less sing-song intonation (below ~0.25 turns robotic)
+  "noiseW": 0.5,                       // lower is steadier, more even timing
+  "sentenceSilence": 0.55,             // seconds of pause between sentences
   "effects": {
     "pitch": 0.9,                          // 0.7..1.3: lower is deeper (the pace is kept)
     "highpass": 110, "lowpass": 5200,      // Hz: a narrower band sounds more like a line or radio
@@ -103,6 +104,15 @@ curl -s -H 'content-type: application/json' \
   -d '{"text":"Listen up.","format":"mp3","tune":{"pitch":0.85,"drive":9,"lowpass":4200}}' \
   -o try.mp3 http://127.0.0.1:8087/speak
 ```
+
+**Upward inflection.** Piper takes its intonation from punctuation: a comma or a question mark
+makes the pitch rise ("I'm continuing" or "I'm asking"); a full stop makes it fall. So the
+strongest lever is the text, not a setting. For a flat, final, commanding delivery, write short
+statements ending in full stops, put a full stop where a comma would make a clause trail upward
+("Listen up. You have three things." rather than "Listen up, you have three things"), and avoid
+"!" and "?" unless a question is meant. After that, `noiseScale` (lower is flatter) and the
+speaker itself: each speaker has their own habits, so if one keeps rising, try another from the
+lab's samples. The effects chain can't flatten a pitch contour.
 
 Every number is checked and kept in range before it reaches ffmpeg. For a phone speaker, keep
 `lowpass` at 3500 or higher and `drive` at 12 or lower, or words start to blur.
