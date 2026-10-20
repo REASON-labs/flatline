@@ -29,9 +29,17 @@ mkdirSync(join(OUT, "samples"), { recursive: true });
 function piper(voice, extra = []) {
   const child = spawn(PIPER, ["--model", join(VOICES, `${voice}.onnx`), "--json-input", "--quiet", ...extra], { stdio: ["pipe", "pipe", "inherit"] });
   const waiting = [];
+  let dead = false;
   createInterface({ input: child.stdout }).on("line", (l) => waiting.shift()?.(l.trim()));
+  // A voice this Piper can't load (some newer ones) makes it exit: every waiting line gets null.
+  child.on("exit", () => { dead = true; for (const w of waiting.splice(0)) w(null); });
+  child.stdin.on("error", () => {});
   return {
-    say: (text, output_file, speaker_id) => new Promise((res) => { waiting.push(res); child.stdin.write(JSON.stringify({ text, output_file, ...(speaker_id === undefined ? {} : { speaker_id }) }) + "\n"); }),
+    say: (text, output_file, speaker_id) => new Promise((res) => {
+      if (dead) return res(null);
+      waiting.push(res);
+      child.stdin.write(JSON.stringify({ text, output_file, ...(speaker_id === undefined ? {} : { speaker_id }) }) + "\n");
+    }),
     close: () => child.stdin.end(),
   };
 }
@@ -95,13 +103,14 @@ async function transcribe(file, type) {
 
 // --- 1. the sweep: every speaker of the multi-speaker voice, and each single voice ------------------
 const results = [];
+const unusable = [];
 const t0 = Date.now();
 if (existsSync(join(VOICES, `${MULTI}.onnx`))) {
   const n = JSON.parse(readFileSync(join(VOICES, `${MULTI}.onnx.json`), "utf8")).num_speakers;
   const p = piper(MULTI);
   for (let id = 0; id < n; id++) {
     const f = join(OUT, "wav", `sweep-${id}.wav`);
-    await p.say(SWEEP_TEXT, f, id);
+    if (!(await p.say(SWEEP_TEXT, f, id))) { console.log(`${MULTI} stopped at speaker ${id}`); break; }
     results.push({ voice: MULTI, speaker: id, ...medianF0(readWav(f)) });
   }
   p.close();
@@ -110,9 +119,10 @@ for (const v of SINGLES) {
   if (!existsSync(join(VOICES, `${v}.onnx`))) { console.log(`(skipping ${v}: not installed)`); continue; }
   const p = piper(v);
   const f = join(OUT, "wav", `sweep-${v}.wav`);
-  await p.say(SWEEP_TEXT, f);
-  results.push({ voice: v, speaker: null, ...medianF0(readWav(f)) });
+  const ok = await p.say(SWEEP_TEXT, f);
   p.close();
+  if (!ok) { unusable.push(v); console.log(`(${v} won't load in this Piper: skipped)`); continue; }
+  results.push({ voice: v, speaker: null, ...medianF0(readWav(f)) });
 }
 console.log(`swept ${results.length} voices in ${Math.round((Date.now() - t0) / 1000)} s`);
 
@@ -125,8 +135,9 @@ for (const c of candidates) {
   const id = c.speaker === null ? c.voice.replace(/^en_US-|-medium$/g, "") : `libritts_r-${c.speaker}`;
   const p = piper(c.voice, ["--length_scale", String(dixie.lengthScale), "--noise_scale", String(dixie.noiseScale), "--noise_w", String(dixie.noiseW), "--sentence_silence", String(dixie.sentenceSilence)]);
   const raw = join(OUT, "wav", `${id}.wav`);
-  await p.say(SCRIPT.join(" "), raw, c.speaker ?? undefined);
+  const ok = await p.say(SCRIPT.join(" "), raw, c.speaker ?? undefined);
   p.close();
+  if (!ok) continue;
   const m4a = join(OUT, "wav", `${id}.m4a`);
   await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", raw, "-af", buildFilter(dixie.effects, 22050), "-ac", "1", "-c:a", "aac", "-b:a", "64k", m4a]);
   const heard = await transcribe(m4a, "audio/mp4");
@@ -139,10 +150,11 @@ for (const c of candidates) {
 
 // Clear first (whisper gets nearly every word), then deepest.
 scored.sort((a, b) => (a.dixieWer > 0.15) - (b.dixieWer > 0.15) || a.f0 - b.f0 || a.dixieWer - b.dixieWer);
-const report = { sweptVoices: results.length, script: SCRIPT, preset: dixie, ranked: scored, deepestTwenty: deep.slice(0, 20) };
+const report = { sweptVoices: results.length, unusable, script: SCRIPT, preset: dixie, ranked: scored, deepestTwenty: deep.slice(0, 20) };
 writeFileSync(join(OUT, "report.json"), JSON.stringify(report, null, 2));
 const md = [
   "# Voice lab", "", `Swept ${results.length} voices. Script: "${SCRIPT.join(" ")}"`, "",
+  ...(unusable.length ? [`Won't load in Piper 2023.11.14-2 (newer voices): ${unusable.join(", ")}`, ""] : []),
   "| rank | voice | F0 (Hz) | words missed, Dixie | words missed, plain | heard |", "|---|---|---|---|---|---|",
   ...scored.map((s, i) => `| ${i + 1} | ${s.id} | ${s.f0} | ${Math.round(s.dixieWer * 100)}% | ${Math.round(s.plainWer * 100)}% | ${s.heard.slice(0, 90)} |`),
 ];
