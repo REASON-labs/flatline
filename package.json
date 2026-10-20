@@ -1,6 +1,6 @@
 {
   "name": "flatline",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Self-hosted voice for web apps: speech-to-text (whisper.cpp) and text-to-speech (Piper) on your own server, recording that stops on silence, and Dixie, a voice that reads text aloud. The audio never leaves your box.",
   "license": "MIT",
   "type": "module",

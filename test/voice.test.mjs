@@ -13,6 +13,7 @@ const LOG = join(work, "calls.log");
 await writeFile(join(work, "presets.json"), JSON.stringify({
   dixie: { voice: "en_US-test-medium", speaker: 7, lengthScale: 1.2, effects: { pitch: 0.9, drive: 6, lowpass: 5000 } },
   plain: { voice: "en_US-test-medium", effects: {} },
+  flat: { voice: "en_US-test-medium", flatten: true, effects: {} },
   "bad name!": { voice: "x" },
   sneaky: { voice: "../../etc/passwd" },
 }));
@@ -22,6 +23,7 @@ Object.assign(process.env, {
   FLATLINE_VOICES_DIR: work, FLATLINE_VOICE_PRESETS: join(work, "presets.json"), FLATLINE_VOICE_MAX_CHARS: "200",
 });
 const { buildFilter, mergeEffects, FORMATS } = await import("../server/voice/chain.mjs");
+const { flatten } = await import("../server/voice/flatten.mjs");
 const { createVoiceServer, loadPresets, cleanText, stopPipers } = await import("../server/voice/server.mjs");
 const { createSpeaker } = await import("../dist/server/index.js");
 
@@ -72,7 +74,7 @@ test("formats and content types", () => {
 
 test("cleanText and loadPresets: one line of text; bad preset names and voice paths dropped", () => {
   assert.equal(cleanText("  Hello\n\tthere\u0007 you "), "Hello there you");
-  assert.deepEqual(Object.keys(loadPresets()).sort(), ["dixie", "plain"]);
+  assert.deepEqual(Object.keys(loadPresets()).sort(), ["dixie", "flat", "plain"]);
 });
 
 // --- the service, with stand-ins ------------------------------------------------------------
@@ -121,7 +123,7 @@ test("refusals: empty, too long, unknown preset, unknown format, not JSON, wrong
 
 test("GET / lists presets and formats", async () => {
   const b = await (await fetch(`${url}/`)).json();
-  assert.deepEqual([b.ok, b.presets.sort(), b.formats], [true, ["dixie", "plain"], ["m4a", "mp3", "ogg", "wav"]]);
+  assert.deepEqual([b.ok, b.presets.sort(), b.formats], [true, ["dixie", "flat", "plain"], ["m4a", "mp3", "ogg", "wav"]]);
 });
 
 test("one at a time, with a short queue: past it, \"busy\"", async () => {
@@ -148,7 +150,7 @@ test("createSpeaker: audio back, with its type", async () => {
   assert.equal(r.ok, true);
   assert.equal(r.contentType, "audio/mpeg");
   assert.ok(r.audio.byteLength > 44 && r.ms >= 0);
-  assert.deepEqual((await s.presets()).sort(), ["dixie", "plain"]);
+  assert.deepEqual((await s.presets()).sort(), ["dixie", "flat", "plain"]);
   assert.equal(await s.health(), true);
 });
 
@@ -177,4 +179,38 @@ test("createSpeaker: an ffmpeg failure is a plain bad_response", async () => {
     const r = await createSpeaker({ url }).speak("Broken.");
     assert.deepEqual([r.ok, r.code], [false, "bad_response"]);
   } finally { delete process.env.FAKE_FFMPEG_FAIL; }
+});
+
+// --- flatten: a flat, final delivery (punctuation drives Piper's intonation) ------------------
+
+for (const [said, shaped, why] of [
+  ["Listen up, you have three things", "Listen up. You have three things.", "a clause comma becomes a full stop"],
+  ["Good, that's one done, now get some sleep.", "Good. That's one done. Now get some sleep.", "several clauses"],
+  ["First the dishes, then you rest.", "First the dishes. Then you rest.", "then"],
+  ["Great! Do it now!", "Great. Do it now.", "\"!\" becomes \".\""],
+  ["I said it once; I will not say it again", "I said it once. I will not say it again.", "a semicolon ends a clause"],
+  ["Pick up milk, eggs and bread.", "Pick up milk, eggs and bread.", "a list keeps its commas"],
+  ["Take your meds, drink some water, and check in before noon.", "Take your meds, drink some water, and check in before noon.", "a list of things to do"],
+  ["That will be 1,200 points.", "That will be 1,200 points.", "a number"],
+  ["Leave at nine, thirty.", "Leave at nine, thirty.", "a time in words"],
+  ["Leave by 3.30.", "Leave by 3.30.", "a decimal point isn't a sentence end"],
+  ["Are you done, or not?", "Are you done, or not?", "a question is left alone"],
+  ["Done?! Then go.", "Done? Then go.", "\"?!\" stays a question"],
+  ["Rest, and then you can go.", "Rest, and then you can go.", "never after \"and\""],
+  ["ok, i will", "Ok. I will.", "capitalised, and \"i\" becomes \"I\""],
+  ["   ", "", "nothing stays nothing"],
+]) {
+  test(`flatten: ${why}`, () => assert.equal(flatten(said), shaped));
+}
+
+test("a preset with flatten shapes the text before Piper; a request can turn it on or off", async () => {
+  const lastLine = async () => (await calls()).findLast((c) => c.line).line.text;
+  await fetch(`${url}/speak`, { method: "POST", body: JSON.stringify({ text: "Listen up, you have work!", preset: "flat", format: "wav" }) });
+  assert.equal(await lastLine(), "Listen up. You have work.");
+  await fetch(`${url}/speak`, { method: "POST", body: JSON.stringify({ text: "Listen up, you have work!", preset: "flat", format: "wav", flatten: false }) });
+  assert.equal(await lastLine(), "Listen up, you have work!");
+  await fetch(`${url}/speak`, { method: "POST", body: JSON.stringify({ text: "Listen up, you have work!", preset: "plain", format: "wav", flatten: true }) });
+  assert.equal(await lastLine(), "Listen up. You have work.");
+  await fetch(`${url}/speak`, { method: "POST", body: JSON.stringify({ text: "Listen up, you have work!", preset: "plain", format: "wav", flatten: "yes" }) });
+  assert.equal(await lastLine(), "Listen up, you have work!");   // only true/false count
 });

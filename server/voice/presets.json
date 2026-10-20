@@ -3,6 +3,7 @@
     "about": "Dixie Flatline: deep, slow and deliberate, flat and level (little upward inflection), gritty, a voice down a line. Tuned by ear on 2026-10-20. Keep it clear on a phone speaker.",
     "voice": "en_US-libritts_r-medium",
     "speaker": 137,
+    "flatten": true,
     "lengthScale": 1.3,
     "noiseScale": 0.35,
     "noiseW": 0.5,

@@ -66,6 +66,7 @@ The service's own API, for curl:
 
 ```bash
 curl -s http://127.0.0.1:8087/                       # { ok, presets, formats }
+# POST /speak takes { text, preset?, format?, tune?, flatten? }
 curl -s -H 'content-type: application/json' \
   -d '{"text":"Listen up.","preset":"dixie","format":"mp3"}' \
   -o dixie.mp3 http://127.0.0.1:8087/speak
@@ -80,6 +81,7 @@ Presets live in `/etc/flatline/voice-presets.json` (the shipped ones are in
 "dixie": {
   "voice": "en_US-libritts_r-medium",  // a Piper voice in /var/lib/flatline/voices
   "speaker": 137,                      // for multi-speaker voices: which speaker
+  "flatten": true,                     // shape the text for a flat, final delivery (below)
   "lengthScale": 1.3,                  // > 1 is slower, more deliberate
   "noiseScale": 0.35,                  // lower is flatter, less sing-song intonation (below ~0.25 turns robotic)
   "noiseW": 0.5,                       // lower is steadier, more even timing
@@ -104,6 +106,14 @@ curl -s -H 'content-type: application/json' \
   -d '{"text":"Listen up.","format":"mp3","tune":{"pitch":0.85,"drive":9,"lowpass":4200}}' \
   -o try.mp3 http://127.0.0.1:8087/speak
 ```
+
+**`flatten`.** On a preset, it shapes the text before Piper sees it: `!` becomes `.`, a semicolon
+ends a sentence, and a comma that clearly ends a clause (the next word is "you", "that's", "then",
+"now" and the like) becomes a full stop: "Listen up, you have three things" is spoken as "Listen up.
+You have three things." Lists ("milk, eggs and bread"), numbers ("1,200", "nine, thirty", "3.30"),
+a comma before "and", and questions are left exactly as they are: when it can't tell, it leaves the
+comma. A request can turn it on or off with `"flatten": true` or `false` to compare. The dixie
+preset has it on.
 
 **Upward inflection.** Piper takes its intonation from punctuation: a comma or a question mark
 makes the pitch rise ("I'm continuing" or "I'm asking"); a full stop makes it fall. So the

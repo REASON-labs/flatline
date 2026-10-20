@@ -3,7 +3,7 @@
 // encodes it. Loopback only, no dependencies beyond Node 20+, Piper and ffmpeg.
 //
 //   GET  /         { ok, presets, formats }
-//   POST /speak    { text, preset?, format?, tune? }  ->  audio (or { error, code })
+//   POST /speak    { text, preset?, format?, tune?, flatten? }  ->  audio (or { error, code })
 //
 // One Piper process per preset stays running (the model loads once), and one sentence is made
 // at a time (it is CPU-bound), with a short queue. Settings come from the environment (see
@@ -17,6 +17,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline";
 import { buildFilter, mergeEffects, FORMATS } from "./chain.mjs";
+import { flatten } from "./flatten.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const env = process.env;
@@ -117,9 +118,11 @@ function sampleRate(voice) {
 }
 
 /** Text in, encoded audio out. */
-export async function render(presets, { text, preset = "dixie", format = "m4a", tune }) {
+export async function render(presets, { text, preset = "dixie", format = "m4a", tune, flatten: flat }) {
   const p = presets[preset];
   if (!p) throw Object.assign(new Error(`No preset "${preset}".`), { code: "unknown_preset", status: 404 });
+  // A preset's "flatten" (or a request's, true or false, to compare) shapes the text first.
+  if (typeof flat === "boolean" ? flat : p.flatten === true) text = flatten(text);
   const fmt = FORMATS[format];
   if (!fmt) throw Object.assign(new Error(`No format "${format}".`), { code: "bad_format", status: 400 });
   const dir = await mkdtemp(join(env.FLATLINE_VOICE_TMP ?? tmpdir(), "voice-"));
@@ -172,7 +175,7 @@ export function createVoiceServer(presets = loadPresets()) {
       if (!text) return send(res, 400, { error: "There's nothing to say.", code: "empty" });
       if (text.length > MAX_CHARS) return send(res, 413, { error: `Keep it under ${MAX_CHARS} characters.`, code: "too_long" });
       const started = Date.now();
-      const out = await enqueue(() => render(presets, { text, preset: body.preset ?? "dixie", format: body.format ?? "m4a", tune: body.tune }));
+      const out = await enqueue(() => render(presets, { text, preset: body.preset ?? "dixie", format: body.format ?? "m4a", tune: body.tune, flatten: typeof body.flatten === "boolean" ? body.flatten : undefined }));
       log(`spoke ${text.length} chars as ${body.preset ?? "dixie"}/${body.format ?? "m4a"} in ${Date.now() - started} ms`);
       return send(res, 200, out.audio, out.type);
     } catch (e) {

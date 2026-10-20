@@ -92,7 +92,7 @@ chown -R "$USER_NAME:$USER_NAME" "$VOICES"
 
 echo "The service..."
 install -d -m 0755 "$PREFIX/voice"
-install -m 0644 "$HERE/voice/server.mjs" "$HERE/voice/chain.mjs" "$HERE/voice/presets.json" "$PREFIX/voice/"
+install -m 0644 "$HERE/voice/server.mjs" "$HERE/voice/chain.mjs" "$HERE/voice/flatten.mjs" "$HERE/voice/presets.json" "$PREFIX/voice/"
 if [ ! -s "$PRESETS" ] || [ "${FLATLINE_VOICE_RESET_PRESETS:-0}" = 1 ]; then
   [ -s "$PRESETS" ] && cp "$PRESETS" "$PRESETS.$(date +%Y%m%d%H%M%S).bak"
   install -m 0644 "$HERE/voice/presets.json" "$PRESETS"
