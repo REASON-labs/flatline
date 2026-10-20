@@ -74,6 +74,9 @@ curl -s -H 'content-type: application/json' \
 
 ## Tuning the preset
 
+The quick, practical version is [Tweaking Dixie](TWEAKING-DIXIE.md): every knob in plain words,
+how to hear a change first, recipes, and how to undo. The details:
+
 Presets live in `/etc/flatline/voice-presets.json` (the shipped ones are in
 `server/voice/presets.json`). Edit, then `sudo systemctl restart flatline-voice`.
 

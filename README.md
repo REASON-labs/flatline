@@ -65,6 +65,7 @@ else reply({ error: r.error }, r.code === "unavailable" ? 503 : 400);
 
 A complete minimal server is in [examples/node-server.mjs](examples/node-server.mjs).
 For Dixie's voice, see [docs/VOICE.md](docs/VOICE.md): install it, tune the preset, and the licences.
+To change how she sounds in five minutes: [Tweaking Dixie](docs/TWEAKING-DIXIE.md).
 
 **3. The page** (call it from a tap: browsers allow the mic and speech only after one):
 
