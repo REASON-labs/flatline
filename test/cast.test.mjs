@@ -71,6 +71,10 @@ for (const [id, lines] of all) {
     assert.match(lines.inbox.ready, /\bYES\b/); assert.match(lines.inbox.ready, /\bNO\b/);
     assert.match(lines.inbox.ready, /\{changes\}/);
     assert.match(lines.inbox.failed, /^\{error\} /);
+    // "1 change" and "3 changes" both read right: no verb that agrees with only one of them.
+    for (const n of [1, 3]) for (const k of ["ready", "applied"]) {
+      assert.doesNotMatch(fill(lines.inbox[k], { ...changesVars(n), name: "App" }), /\b1 change (go|deploy|take|are)\b|\b3 changes (goes|deploys|takes|is)\b/, `${k} with ${n}`);
+    }
   });
 }
 
