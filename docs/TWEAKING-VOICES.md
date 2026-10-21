@@ -1,6 +1,8 @@
-# Tweaking Dixie
+# Tweaking a voice
 
-A five-minute guide to changing how Dixie sounds on your server. You'll need a shell on the server
+A five-minute guide to changing how a character sounds on your server. The examples use Flatline
+(the `flatline` preset); every character works the same way (`kestrel`, `iris`, `ashford`, `hoshi`,
+`calder`, and `plain`). You'll need a shell on the server
 (examples use `you@your-server`) and `sudo`.
 
 ## Where the settings are
@@ -9,7 +11,9 @@ A five-minute guide to changing how Dixie sounds on your server. You'll need a s
 /etc/flatline/voice-presets.json
 ```
 
-Dixie is the `"dixie"` entry. After editing, apply it with:
+Flatline is the `"flatline"` entry (and `"dixie"`, her old name, is `{ "sameAs": "flatline" }`: edit
+`"flatline"`). On a box upgraded from 0.2, `"dixie"` is still your own full entry and `"flatline"` a
+copy of it; apps ask for `flatline` now, so tune that one. Each character has its own entry. After editing, apply it with:
 
 ```bash
 sudo systemctl restart flatline-voice
@@ -56,14 +60,14 @@ Run these on the server. They write an MP3 you can then copy to your own machine
 
 ```bash
 curl -s -H 'content-type: application/json' \
-  -d '{"text":"Listen up. You have three things to do today.","preset":"dixie","format":"mp3","tune":{"pitch":0.85,"drive":9}}' \
+  -d '{"text":"Listen up. You have three things to do today.","preset":"flatline","format":"mp3","tune":{"pitch":0.85,"drive":9}}' \
   -o /tmp/try.mp3 http://127.0.0.1:8087/speak
 ```
 
 **Compare with and without `flatten`:** add `"flatten": false` (or `true`) to the same request.
 
-**Try Piper settings** (pace, wander, speaker) with a scratch preset next to `dixie`, so the real
-one stays untouched. In `/etc/flatline/voice-presets.json`, copy the whole `"dixie": { ... }` entry
+**Try Piper settings** (pace, wander, speaker) with a scratch preset next to `flatline`, so the real
+one stays untouched. In `/etc/flatline/voice-presets.json`, copy the whole `"flatline": { ... }` entry
 as `"try": { ... }`, change what you like, restart, and ask for `"preset":"try"`:
 
 ```bash
@@ -79,7 +83,7 @@ curl -s -H 'content-type: application/json' \
 scp you@your-server:/tmp/try.mp3 .
 ```
 
-When you like it, copy those values into `"dixie"`, restart, and delete `"try"` if you want.
+When you like it, copy those values into `"flatline"`, restart, and delete `"try"` if you want.
 
 ## Recipes
 
@@ -101,7 +105,7 @@ A quick edit without opening an editor (here: slower, then restart):
 sudo node -e '
 const f = "/etc/flatline/voice-presets.json", fs = require("fs");
 const p = JSON.parse(fs.readFileSync(f, "utf8"));
-p.dixie.lengthScale = 1.4;
+p.flatline.lengthScale = 1.4;
 fs.writeFileSync(f, JSON.stringify(p, null, 2) + "\n");' && sudo systemctl restart flatline-voice
 ```
 

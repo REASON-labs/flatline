@@ -51,3 +51,29 @@ Once you're sure, remove the old service's files. This can't be undone, so look 
 ```bash
 ssh -t you@your-server 'sudo rm /etc/systemd/system/whisper.service && sudo systemctl daemon-reload && sudo rm -rf /opt/whisper /var/lib/whisper && sudo userdel whisper'
 ```
+
+# Upgrading the voice service to 0.3 (the cast)
+
+0.3 makes the voice a cast of characters. Dixie is now **Flatline**; `dixie` keeps working as her
+other name, so nothing that asks for it breaks.
+
+```bash
+sudo cp /etc/flatline/voice-presets.json /etc/flatline/voice-presets.json.$(date +%Y%m%d%H%M%S).bak
+scp -r server you@your-server:/tmp/flatline-server
+ssh -t you@your-server 'sudo bash /tmp/flatline-server/install-voice.sh'
+```
+
+The installer fetches the cast's voices (about 270 MB more), keeps every preset you have exactly
+as it is, and adds the new ones: `flatline` as a copy of **your** `dixie` (so your tuning carries
+over), then `kestrel`, `iris`, `ashford`, `hoshi` and `calder`. It keeps a dated backup when it
+adds anything. A request with no preset now gets `flatline` (or `dixie` where there is no
+`flatline`).
+
+Check it:
+
+```bash
+ssh you@your-server 'curl -s http://127.0.0.1:8087/'   # presets include flatline ... calder; default "flatline"
+```
+
+Apps: `createSpeaker().speak()` and the browser's `dixie.speak()` no longer send `"dixie"` when
+no preset is given; the service picks its default. Pick a character's preset from `flatline/cast`.

@@ -1,7 +1,7 @@
 {
   "name": "flatline",
-  "version": "0.2.2",
-  "description": "Self-hosted voice for web apps: speech-to-text (whisper.cpp) and text-to-speech (Piper) on your own server, recording that stops on silence, and Dixie, a voice that reads text aloud. The audio never leaves your box.",
+  "version": "0.3.0",
+  "description": "Self-hosted voice for web apps: speech-to-text (whisper.cpp) and text-to-speech (Piper) on your own server, recording that stops on silence, and a cast of voice characters (Flatline, Kestrel, Iris, Ashford, Hoshi and Captain Calder), each a sound, a tone and a set of lines. The audio never leaves your box.",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -12,6 +12,10 @@
     "./browser": {
       "types": "./dist/browser/index.d.ts",
       "default": "./dist/browser/index.js"
+    },
+    "./cast": {
+      "types": "./dist/cast/index.d.ts",
+      "default": "./dist/cast/index.js"
     }
   },
   "files": [
@@ -30,7 +34,8 @@
     "test": "npm run build && node --test test/*.test.mjs",
     "test:browser": "npm run build && node --test test/*.browser.mjs",
     "test:whisper": "npm run build && node --test test/whisper.integration.mjs",
-    "test:voice": "npm run build && node --test test/voice.integration.mjs"
+    "test:voice": "npm run build && node --test test/voice.integration.mjs",
+    "samples": "node tools/cast-samples.mjs"
   },
   "keywords": [
     "mediarecorder",

@@ -63,7 +63,11 @@ const t = await transcribeOnServer("/api/transcribe", r.audio, { headers: { "x-s
 It POSTs the audio as the raw body with its content type, and expects `{ text }` back (or
 `{ error }` with an error status), which is what `examples/node-server.mjs` answers.
 
-## Dixie
+## Dixie, the speaker
+
+`dixie` is the browser's speaker. It's named for the voice it started with; since 0.3 it speaks
+as any character in the cast: `dixie.configure({ endpoint, preset: "kestrel" })`, or leave out
+`preset` for the server's default (Flatline). The characters are in [CAST.md](CAST.md).
 
 ```js
 import { dixie } from "flatline/browser";

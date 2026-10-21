@@ -1,13 +1,16 @@
-# Dixie's voice: text to speech on your own server
+# The voices: text to speech on your own server
 
 `server/install-voice.sh` installs **flatline-voice**: [Piper](https://github.com/rhasspy/piper), a
 fast speech engine that runs on the CPU, behind a small Node service that gives each **preset**
 its sound with ffmpeg. It listens on **127.0.0.1:8087** only. Text goes to it and audio comes
 back; nothing is sent anywhere else.
 
-The **dixie** preset is the Dixie Flatline: a deep voice, slow and deliberate, pitched down,
-compressed, with grit and a faint line or radio colour, still clear on a phone speaker. It
-doesn't imitate any real person's voice: it is a stock voice with effects, tuned for character.
+Each **character** in the cast ([CAST.md](CAST.md)) has a preset: **flatline** (the default), **kestrel**,
+**iris**, **ashford**, **hoshi** and **calder**, plus **plain** (Flatline's voice with no effects).
+**flatline** is a deep voice, slow and deliberate, pitched down, compressed, with grit and a faint
+line or radio colour, still clear on a phone speaker. It was called **dixie** before 0.3.0; `dixie`
+still works, as another name for it. None of them imitates a real person's voice: each is a stock
+voice with effects, tuned for character.
 
 ## Install
 
@@ -16,8 +19,11 @@ sudo bash server/install-voice.sh
 ```
 
 It needs Node 20+ (already there if a Flatline app runs on the box) and installs ffmpeg. It
-downloads Piper and the voice at pinned versions, checks their SHA-256, and starts the service.
-It's safe to re-run, and it keeps your edited presets.
+downloads Piper and the cast's voices at pinned versions (about 350 MB), checks their SHA-256,
+and starts the service. It's safe to re-run, and it keeps your edited presets: a preset you have
+is never changed, and presets that are new in a release (a new character) are added beside yours,
+after a dated backup (`voice-presets.json.<date>.bak`). Upgrading from 0.2: your own `dixie` is
+copied to `flatline`, so her sound stays exactly as you tuned it.
 
 On a remote server, copy the `server/` folder over (the installer needs `server/voice/` next to it)
 and run it there:
@@ -33,9 +39,14 @@ ssh -t you@your-server 'sudo bash /tmp/flatline-server/install-voice.sh'
 | `FLATLINE_VOICE_EXTRA` | none | more Piper voices to fetch, e.g. `"en_US-joe-medium"`, to try in a preset |
 | `FLATLINE_VOICE_RESET_PRESETS` | `0` | `1` replaces your presets with the shipped ones (a backup is kept) |
 | `FLATLINE_VOICE_MEMORY_MAX` | `1G` | systemd memory cap |
+| `FLATLINE_VOICE_MAX_PIPERS` | `4` | Piper processes kept running at once (about 120 MB each) |
 
 On a 4-core server a sentence takes well under a second; one is made at a time, with a short
-queue (a full queue answers "busy").
+queue (a full queue answers "busy"). Each voice in use keeps a Piper running so its model loads
+once; presets with the same voice and pace share one. With six characters that's more than the
+memory cap wants, so at most `FLATLINE_VOICE_MAX_PIPERS` run: the least recently used stops
+first, one idle for 15 minutes stops on its own, and the first sentence in a voice that was
+stopped takes about a second longer.
 
 ## Using it
 
@@ -45,7 +56,7 @@ From an app's backend:
 import { createSpeaker } from "flatline/server";
 const voice = createSpeaker({ url: process.env.FLATLINE_VOICE_URL }); // http://127.0.0.1:8087
 
-const r = await voice.speak("Check in before noon.", { preset: "dixie", format: "m4a" });
+const r = await voice.speak("Check in before noon.", { preset: "kestrel", format: "m4a" });   // no preset: flatline
 if (r.ok) sendVoiceMemo(r.audio, r.contentType);       // audio: Uint8Array, contentType: audio/mp4
 else console.log(r.code, r.error);
 ```
@@ -65,23 +76,23 @@ makes `dixie.speak()` use this voice through your app's endpoint (see
 The service's own API, for curl:
 
 ```bash
-curl -s http://127.0.0.1:8087/                       # { ok, presets, formats }
+curl -s http://127.0.0.1:8087/                       # { ok, presets, default, formats }
 # POST /speak takes { text, preset?, format?, tune?, flatten? }
 curl -s -H 'content-type: application/json' \
-  -d '{"text":"Listen up.","preset":"dixie","format":"mp3"}' \
-  -o dixie.mp3 http://127.0.0.1:8087/speak
+  -d '{"text":"Listen up.","preset":"flatline","format":"mp3"}' \
+  -o flatline.mp3 http://127.0.0.1:8087/speak
 ```
 
 ## Tuning the preset
 
-The quick, practical version is [Tweaking Dixie](TWEAKING-DIXIE.md): every knob in plain words,
+The quick, practical version is [Tweaking a voice](TWEAKING-VOICES.md): every knob in plain words,
 how to hear a change first, recipes, and how to undo. The details:
 
 Presets live in `/etc/flatline/voice-presets.json` (the shipped ones are in
 `server/voice/presets.json`). Edit, then `sudo systemctl restart flatline-voice`.
 
 ```jsonc
-"dixie": {
+"flatline": {
   "voice": "en_US-libritts_r-medium",  // a Piper voice in /var/lib/flatline/voices
   "speaker": 137,                      // for multi-speaker voices: which speaker
   "flatten": true,                     // shape the text for a flat, final delivery (below)
@@ -115,8 +126,11 @@ ends a sentence, and a comma that clearly ends a clause (the next word is "you",
 "now" and the like) becomes a full stop: "Listen up, you have three things" is spoken as "Listen up.
 You have three things." Lists ("milk, eggs and bread"), numbers ("1,200", "nine, thirty", "3.30"),
 a comma before "and", and questions are left exactly as they are: when it can't tell, it leaves the
-comma. A request can turn it on or off with `"flatten": true` or `false` to compare. The dixie
-preset has it on.
+comma. A request can turn it on or off with `"flatten": true` or `false` to compare. Each
+character chooses: all have it on except hoshi, whose gentle lilt is part of her warmth.
+
+**Other names.** A preset can be another one's other name: `"dixie": { "sameAs": "flatline" }`.
+It is the same preset (and the same Piper), so an app that still asks for `dixie` gets Flatline.
 
 **Upward inflection.** Piper takes its intonation from punctuation: a comma or a question mark
 makes the pitch rise ("I'm continuing" or "I'm asking"); a full stop makes it fall. So the
@@ -151,20 +165,27 @@ downloads them from their publishers, and the service runs Piper as a separate p
 | Piper 2023.11.14-2 (rhasspy/piper) | MIT | the last MIT release; development continues as piper1-gpl (GPL-3.0), not used here |
 | espeak-ng (inside Piper's download) | GPL-3.0 | Piper uses it to turn text into phonemes; it runs inside Piper's own process |
 | Piper voice models (rhasspy/piper-voices) | MIT (the models) | each voice is trained on a dataset with its own licence, below |
-| `en_US-libritts_r-medium` (the default) | CC BY 4.0 (LibriTTS-R) | free to use, commercially too, **with credit**: "Voice: Piper en_US-libritts_r, trained on LibriTTS-R (CC BY 4.0)" |
+| `en_US-libritts_r-medium` (flatline, plain) | CC BY 4.0 (LibriTTS-R) | free to use, commercially too, **with credit**: "Voice: Piper en_US-libritts_r, trained on LibriTTS-R (CC BY 4.0)" |
+| `en_US-kristin-medium` (kestrel) | public domain (LibriVox) | |
+| `en_GB-cori-medium` (iris) | public domain (LibriVox) | |
+| `en_GB-vctk-medium` (ashford: speaker 95, calder: speaker 76) | CC BY 4.0 (CSTR VCTK Corpus) | commercially too, **with credit**: "Voice: Piper en_GB-vctk, trained on the CSTR VCTK Corpus (CC BY 4.0)" |
+| `en_US-sam-medium` (hoshi) | Apache-2.0 (the Sam non-binary voice dataset) | commercial use allowed; keep the licence notice |
 | `en_US-bryce`, `en_US-john`, `en_US-norman` | public domain | |
 | `en_US-joe` | CC0 | (`en_US-mike`, also CC0, is too new for this Piper and won't load) |
 | ffmpeg (Ubuntu's package) | LGPL/GPL | a separate program the service runs |
 
-Voices with non-commercial licences (`en_US-ryan`, `en_US-hfc_male`, `en_US-l2arctic` among them)
-are deliberately not used.
+Each licence above is the one stated in that voice's MODEL_CARD in rhasspy/piper-voices (pinned
+revision `c10ece1`), checked on 2026-10-21. Voices with non-commercial licences (`en_US-ryan`,
+`en_US-hfc_male`, `en_US-hfc_female`, `en_US-l2arctic`, `en_GB-semaine` among them) are deliberately
+not used, and nor are voices whose card only says "see URL" without a clear licence
+(`en_GB-alan`, `en_GB-jenny_dioco`, `en_US-amy`, `en_US-kusal`, `en_US-arctic`, `en_US-lessac`).
 
 ## What's installed where
 
 | Path | |
 |---|---|
 | `/opt/flatline/piper` | Piper, its libraries and espeak-ng data |
-| `/opt/flatline/voice` | the service (`server.mjs`, `chain.mjs`) |
+| `/opt/flatline/voice` | the service (`server.mjs`, `chain.mjs`, `flatten.mjs`, `merge-presets.mjs`) |
 | `/var/lib/flatline/voices` | voice models |
 | `/etc/flatline/voice-presets.json` | your presets |
 | `/etc/systemd/system/flatline-voice.service` | the unit (same hardening as flatline-whisper) |
