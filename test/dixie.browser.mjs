@@ -165,7 +165,19 @@ test("with an endpoint, she plays the server's voice and resolves when it ends",
   assert.equal(r.out, "done");
   assert.ok(r.ms >= 550, `resolved after ${r.ms} ms`);
   assert.equal(r.phoneSaid, 0, "the phone's voice wasn't used");
-  assert.deepEqual(voiceLog[0], { path: "/speak", body: { text: "Listen to me.", preset: "dixie", format: "mp3" }, session: "s1" });
+  assert.deepEqual(voiceLog[0], { path: "/speak", body: { text: "Listen to me.", format: "mp3" }, session: "s1" });
+});
+
+test("a character's preset goes to the endpoint when one is set (configure, or per call)", { timeout: 30_000 }, async () => {
+  voiceLog.length = 0;
+  const p = await voicePage();
+  await p.evaluate(async () => {
+    const { dixie } = await import("/dist/browser/index.js");
+    dixie.configure({ endpoint: "/speak", preset: "kestrel" });
+    await dixie.speak("Objective.");
+    await dixie.speak("Hello.", { preset: "hoshi" });
+  });
+  assert.deepEqual(voiceLog.map((v) => v.body.preset), ["kestrel", "hoshi"]);
 });
 
 test("hush() stops the server's voice mid-sentence: \"cancelled\", and the player stops", { timeout: 30_000 }, async () => {

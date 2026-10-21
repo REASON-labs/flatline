@@ -36,7 +36,7 @@ export interface SpeakerOptions {
 }
 
 export interface Speaker {
-  /** Text in, audio out. Preset default "dixie"; format default "m4a" (AAC: Signal, iPhone). */
+  /** Text in, audio out. Preset: a character's (flatline/cast), unset for the service's default (flatline); format default "m4a" (AAC: Signal, iPhone). */
   speak(text: string, opts?: { preset?: string; format?: SpeakFormat; tune?: Tune }): Promise<SpeakResult>;
   /** The service's presets, or null when it can't be reached. */
   presets(): Promise<string[] | null>;
@@ -76,7 +76,7 @@ export function createSpeaker(opts: SpeakerOptions): Speaker {
         const res = await doFetch(`${base}/speak`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text: words, preset: o.preset ?? "dixie", format: o.format ?? "m4a", ...(o.tune ? { tune: o.tune } : {}) }),
+          body: JSON.stringify({ text: words, ...(o.preset ? { preset: o.preset } : {}), format: o.format ?? "m4a", ...(o.tune ? { tune: o.tune } : {}) }),
           signal: AbortSignal.timeout(timeoutMs),
         });
         const type = res.headers.get("content-type") ?? "";

@@ -11,7 +11,7 @@ export interface SpeakOptions {
     /** Speak with the server's voice: POST { text, preset, format } here, audio back. null = the
      *  phone's voice even when configure() set an endpoint. */
     endpoint?: string | null;
-    /** The server preset (default "dixie"). */
+    /** The server preset (a character, e.g. "kestrel"). Unset: the service's default (flatline). */
     preset?: string;
     /** Extra request headers (a session token, say). */
     headers?: Record<string, string>;

@@ -20,7 +20,7 @@ export interface SpeakOptions {
   /** Speak with the server's voice: POST { text, preset, format } here, audio back. null = the
    *  phone's voice even when configure() set an endpoint. */
   endpoint?: string | null;
-  /** The server preset (default "dixie"). */
+  /** The server preset (a character, e.g. "kestrel"). Unset: the service's default (flatline). */
   preset?: string;
   /** Extra request headers (a session token, say). */
   headers?: Record<string, string>;
@@ -150,7 +150,7 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<SpeakResul
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json", ...config.headers, ...opts.headers },
-      body: JSON.stringify({ text: words, preset: opts.preset ?? config.preset ?? "dixie", format: config.format ?? "mp3" }),
+      body: JSON.stringify({ text: words, ...((opts.preset ?? config.preset) ? { preset: opts.preset ?? config.preset } : {}), format: config.format ?? "mp3" }),
       signal: ac.signal,
     }).then(async (res) => {
       if (!res.ok || !(res.headers.get("content-type") ?? "").startsWith("audio/")) throw new Error(`status ${res.status}`);

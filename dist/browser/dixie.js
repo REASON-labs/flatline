@@ -173,7 +173,7 @@ export function speak(text, opts = {}) {
             method: "POST",
             credentials: "same-origin",
             headers: { "content-type": "application/json", ...config.headers, ...opts.headers },
-            body: JSON.stringify({ text: words, preset: opts.preset ?? config.preset ?? "dixie", format: config.format ?? "mp3" }),
+            body: JSON.stringify({ text: words, ...((opts.preset ?? config.preset) ? { preset: opts.preset ?? config.preset } : {}), format: config.format ?? "mp3" }),
             signal: ac.signal,
         }).then(async (res) => {
             if (!res.ok || !(res.headers.get("content-type") ?? "").startsWith("audio/"))

@@ -41,7 +41,7 @@ export interface SpeakerOptions {
     fetch?: typeof fetch;
 }
 export interface Speaker {
-    /** Text in, audio out. Preset default "dixie"; format default "m4a" (AAC: Signal, iPhone). */
+    /** Text in, audio out. Preset: a character's (flatline/cast), unset for the service's default (flatline); format default "m4a" (AAC: Signal, iPhone). */
     speak(text: string, opts?: {
         preset?: string;
         format?: SpeakFormat;
