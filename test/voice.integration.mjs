@@ -24,6 +24,16 @@ test("the service is up, with its presets", { skip }, async () => {
   assert.ok(p.includes("dixie") && p.includes("plain"), p.join());
 });
 
+test("every character in the cast speaks, with its own preset", { skip, timeout: 300_000 }, async () => {
+  const { CAST } = await import("../dist/cast/index.js");
+  const p = await speaker.presets();
+  for (const c of CAST) {
+    assert.ok(p.includes(c.preset), `no preset ${c.preset}`);
+    const r = await speaker.speak(c.sample, { preset: c.preset, format: "mp3" });
+    assert.equal(r.ok, true, `${c.id}: ${JSON.stringify(r)}`);
+  }
+});
+
 for (const format of ["m4a", "mp3", "ogg", "wav"]) {
   test(`speaks ${format}`, { skip, timeout: 120_000 }, async () => {
     const r = await speaker.speak("Check in before noon.", { format });
