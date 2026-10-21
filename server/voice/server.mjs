@@ -2,12 +2,16 @@
 // Flatline's text-to-speech service: Piper speaks, ffmpeg gives the voice its character and
 // encodes it. Loopback only, no dependencies beyond Node 20+, Piper and ffmpeg.
 //
-//   GET  /         { ok, presets, formats }
+//   GET  /         { ok, presets, default, formats }
 //   POST /speak    { text, preset?, format?, tune?, flatten? }  ->  audio (or { error, code })
 //
-// One Piper process per preset stays running (the model loads once), and one sentence is made
-// at a time (it is CPU-bound), with a short queue. Settings come from the environment (see
-// server/install-voice.sh); presets from FLATLINE_VOICE_PRESETS, re-read on restart.
+// A Piper process stays running for each voice in use (the model loads once): presets with the
+// same voice and pace share one. At most FLATLINE_VOICE_MAX_PIPERS run at a time (the least
+// recently used one stops first), and one that sits idle stops after FLATLINE_VOICE_IDLE_MS, so
+// a cast of characters fits in the memory cap. One sentence is made at a time (it is CPU-bound),
+// with a short queue. Settings come from the environment (see server/install-voice.sh); presets
+// from FLATLINE_VOICE_PRESETS, re-read on restart. A preset can be another's other name:
+// { "sameAs": "flatline" }.
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
@@ -30,18 +34,33 @@ const PRESETS_FILE = env.FLATLINE_VOICE_PRESETS ?? join(HERE, "presets.json");
 const MAX_CHARS = Number(env.FLATLINE_VOICE_MAX_CHARS ?? 2000);
 const MAX_QUEUE = Number(env.FLATLINE_VOICE_QUEUE ?? 8);
 const JOB_TIMEOUT = Number(env.FLATLINE_VOICE_TIMEOUT_MS ?? 60_000);
+const MAX_PIPERS = Math.max(1, Number(env.FLATLINE_VOICE_MAX_PIPERS ?? 4));
+const IDLE_MS = Number(env.FLATLINE_VOICE_IDLE_MS ?? 15 * 60_000);
 
 const log = (...a) => { if (env.NODE_ENV !== "test") console.log(...a); };
+
+const NAME = /^[a-z0-9_-]{1,40}$/;
 
 export function loadPresets(file = PRESETS_FILE) {
   const raw = JSON.parse(readFileSync(file, "utf8"));
   const out = {};
   for (const [name, p] of Object.entries(raw)) {
-    if (!/^[a-z0-9_-]{1,40}$/.test(name) || !p || typeof p !== "object") continue;
+    if (!NAME.test(name) || !p || typeof p !== "object" || "sameAs" in p) continue;
     if (typeof p.voice !== "string" || !/^[A-Za-z0-9_.-]+$/.test(p.voice)) continue;
     out[name] = p;
   }
+  // Other names ({ "sameAs": "flatline" }): the same preset, by reference. Only to a real one.
+  for (const [name, p] of Object.entries(raw)) {
+    if (!NAME.test(name) || !p || typeof p !== "object" || typeof p.sameAs !== "string") continue;
+    if (out[p.sameAs] && !(name in out)) out[name] = out[p.sameAs];
+  }
   return out;
+}
+
+/** The preset a request without one gets: FLATLINE_VOICE_DEFAULT, else flatline, else dixie, else the first. */
+export function defaultPreset(presets) {
+  for (const n of [env.FLATLINE_VOICE_DEFAULT, "flatline", "dixie"]) if (n && presets[n]) return n;
+  return Object.keys(presets)[0];
 }
 
 /** Text Piper can take: no control characters, one line, trimmed. */
@@ -53,9 +72,36 @@ export function cleanText(t) {
 
 const pipers = new Map();
 
+/** Presets with the same voice and the same pace share a Piper (the speaker is chosen per line). */
+export function piperKey(p) {
+  return [p.voice, clamp(p.lengthScale, 0.5, 2, 1), clamp(p.noiseScale, 0, 1.5, 0.667), clamp(p.noiseW, 0, 1.5, 0.8), clamp(p.sentenceSilence, 0, 2, 0.2)].join("|");
+}
+
+/** How many Piper processes are running (for tests). */
+export const runningPipers = () => [...pipers.values()].filter((p) => !p.dead).length;
+
+function stopPiper(key) {
+  const p = pipers.get(key);
+  if (!p) return;
+  p.dead = true; clearTimeout(p.idle); p.child.kill();
+  pipers.delete(key);
+  log(`piper stopped for ${key.split("|")[0]}`);
+}
+
 function piperFor(name, p) {
-  const have = pipers.get(name);
-  if (have && !have.dead) return have;
+  const key = piperKey(p);
+  const have = pipers.get(key);
+  if (have && !have.dead) {
+    pipers.delete(key); pipers.set(key, have);   // most recently used last
+    return have;
+  }
+  if (have) pipers.delete(key);
+  // Room for one more: stop the least recently used that isn't speaking.
+  while (pipers.size >= MAX_PIPERS) {
+    const idle = [...pipers.entries()].find(([, q]) => !q.waiting.length);
+    if (!idle) break;
+    stopPiper(idle[0]);
+  }
   const model = join(VOICES, `${p.voice}.onnx`);
   const args = ["--model", model, "--json-input", "--quiet",
     "--length_scale", String(clamp(p.lengthScale, 0.5, 2, 1)),
@@ -76,14 +122,14 @@ function piperFor(name, p) {
   };
   child.on("exit", (code) => fail(`piper exited (${code}): ${errTail.trim()}`));
   child.on("error", (e) => fail(`piper didn't start: ${e.message}`));
-  pipers.set(name, proc);
+  pipers.set(key, proc);
   log(`piper started for ${name} (${p.voice})`);
   return proc;
 }
 
 /** Stop every Piper (on SIGTERM, and in tests). */
 export function stopPipers() {
-  for (const p of pipers.values()) { p.dead = true; p.child.kill(); }
+  for (const p of pipers.values()) { p.dead = true; clearTimeout(p.idle); p.child.kill(); }
   pipers.clear();
 }
 
@@ -94,6 +140,9 @@ function clamp(v, min, max, fallback) {
 
 function synthesize(name, p, text, wavPath) {
   const proc = piperFor(name, p);
+  // A Piper nobody has asked for in a while stops, and starts again when it's wanted.
+  clearTimeout(proc.idle);
+  if (IDLE_MS > 0) { proc.idle = setTimeout(() => { if (!proc.waiting.length && pipers.get(piperKey(p)) === proc) stopPiper(piperKey(p)); }, IDLE_MS); proc.idle.unref?.(); }
   return new Promise((resolve, reject) => {
     proc.waiting.push({ resolve, reject });
     const line = { text, output_file: wavPath };
@@ -118,7 +167,7 @@ function sampleRate(voice) {
 }
 
 /** Text in, encoded audio out. */
-export async function render(presets, { text, preset = "dixie", format = "m4a", tune, flatten: flat }) {
+export async function render(presets, { text, preset = defaultPreset(presets), format = "m4a", tune, flatten: flat }) {
   const p = presets[preset];
   if (!p) throw Object.assign(new Error(`No preset "${preset}".`), { code: "unknown_preset", status: 404 });
   // A preset's "flatten" (or a request's, true or false, to compare) shapes the text first.
@@ -165,7 +214,7 @@ function send(res, status, body, type = "application/json") {
 export function createVoiceServer(presets = loadPresets()) {
   return createServer(async (req, res) => {
     try {
-      if (req.method === "GET" && req.url === "/") return send(res, 200, { ok: true, presets: Object.keys(presets), formats: Object.keys(FORMATS) });
+      if (req.method === "GET" && req.url === "/") return send(res, 200, { ok: true, presets: Object.keys(presets), default: defaultPreset(presets), formats: Object.keys(FORMATS) });
       if (req.method !== "POST" || req.url !== "/speak") return send(res, 404, { error: "Not found.", code: "not_found" });
       let raw = "";
       for await (const c of req) { raw += c; if (raw.length > MAX_CHARS * 4 + 4096) return send(res, 413, { error: "Too long.", code: "too_long" }); }
@@ -175,8 +224,9 @@ export function createVoiceServer(presets = loadPresets()) {
       if (!text) return send(res, 400, { error: "There's nothing to say.", code: "empty" });
       if (text.length > MAX_CHARS) return send(res, 413, { error: `Keep it under ${MAX_CHARS} characters.`, code: "too_long" });
       const started = Date.now();
-      const out = await enqueue(() => render(presets, { text, preset: body.preset ?? "dixie", format: body.format ?? "m4a", tune: body.tune, flatten: typeof body.flatten === "boolean" ? body.flatten : undefined }));
-      log(`spoke ${text.length} chars as ${body.preset ?? "dixie"}/${body.format ?? "m4a"} in ${Date.now() - started} ms`);
+      const preset = typeof body.preset === "string" && body.preset ? body.preset : defaultPreset(presets);
+      const out = await enqueue(() => render(presets, { text, preset, format: body.format ?? "m4a", tune: body.tune, flatten: typeof body.flatten === "boolean" ? body.flatten : undefined }));
+      log(`spoke ${text.length} chars as ${preset}/${body.format ?? "m4a"} in ${Date.now() - started} ms`);
       return send(res, 200, out.audio, out.type);
     } catch (e) {
       const status = e.status ?? 500;

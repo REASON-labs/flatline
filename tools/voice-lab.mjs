@@ -127,7 +127,7 @@ for (const v of SINGLES) {
 console.log(`swept ${results.length} voices in ${Math.round((Date.now() - t0) / 1000)} s`);
 
 // --- 2. the deepest male voices, with the Dixie sound, through whisper ----------------------------
-const dixie = PRESETS.dixie;
+const dixie = PRESETS.flatline;
 const deep = results.filter((r) => r.f0 && r.f0 >= 65 && r.f0 <= 135 && r.voiced >= 8).sort((a, b) => a.f0 - b.f0);
 const candidates = [...deep.filter((r) => r.speaker !== null).slice(0, 12), ...deep.filter((r) => r.speaker === null)];
 const scored = [];

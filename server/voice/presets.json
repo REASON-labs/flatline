@@ -1,6 +1,6 @@
 {
-  "dixie": {
-    "about": "Dixie Flatline: deep, slow and deliberate, flat and level (little upward inflection), gritty, a voice down a line. Tuned by ear on 2026-10-20. Keep it clear on a phone speaker.",
+  "flatline": {
+    "about": "Flatline (after the Dixie Flatline): deep, slow and deliberate, flat and level, gritty, a voice down a line. Tuned by ear on 2026-10-20. Keep it clear on a phone speaker.",
     "voice": "en_US-libritts_r-medium",
     "speaker": 137,
     "flatten": true,
@@ -12,24 +12,107 @@
       "pitch": 0.9,
       "highpass": 110,
       "lowpass": 5200,
-      "presence": {
-        "freq": 1900,
-        "gain": 3
-      },
-      "compress": {
-        "threshold": -22,
-        "ratio": 4
-      },
+      "presence": { "freq": 1900, "gain": 3 },
+      "compress": { "threshold": -22, "ratio": 4 },
       "drive": 6,
-      "echo": {
-        "delay": 16,
-        "decay": 0.15
-      },
+      "echo": { "delay": 16, "decay": 0.15 },
+      "loudness": -16
+    }
+  },
+  "dixie": {
+    "about": "The old name for flatline: the same voice, kept so nothing that asks for it breaks.",
+    "sameAs": "flatline"
+  },
+  "kestrel": {
+    "about": "Kestrel: calm, clipped and precise, a field commander on a clean comms line.",
+    "voice": "en_US-kristin-medium",
+    "flatten": true,
+    "lengthScale": 1.05,
+    "noiseScale": 0.4,
+    "noiseW": 0.6,
+    "sentenceSilence": 0.4,
+    "effects": {
+      "pitch": 0.97,
+      "highpass": 160,
+      "lowpass": 7000,
+      "presence": { "freq": 2200, "gain": 3 },
+      "compress": { "threshold": -20, "ratio": 4 },
+      "drive": 2,
+      "loudness": -16
+    }
+  },
+  "iris": {
+    "about": "Iris: serene and very even, a faint metallic sheen. A machine that is perfectly calm.",
+    "voice": "en_GB-cori-medium",
+    "flatten": true,
+    "lengthScale": 1.2,
+    "noiseScale": 0.3,
+    "noiseW": 0.4,
+    "sentenceSilence": 0.6,
+    "effects": {
+      "pitch": 0.98,
+      "highpass": 90,
+      "lowpass": 9000,
+      "presence": { "freq": 1800, "gain": 1 },
+      "compress": { "threshold": -24, "ratio": 2.5 },
+      "echo": { "delay": 9, "decay": 0.22 },
+      "loudness": -17
+    }
+  },
+  "ashford": {
+    "about": "Ashford: a dry English butler, crisp and clean, no effects to speak of.",
+    "voice": "en_GB-vctk-medium",
+    "speaker": 95,
+    "flatten": true,
+    "lengthScale": 1.05,
+    "noiseScale": 0.5,
+    "noiseW": 0.7,
+    "sentenceSilence": 0.35,
+    "effects": {
+      "highpass": 80,
+      "lowpass": 10000,
+      "presence": { "freq": 2000, "gain": 1.5 },
+      "compress": { "threshold": -22, "ratio": 2.5 },
+      "loudness": -16
+    }
+  },
+  "hoshi": {
+    "about": "Hoshi: soft, warm and unhurried, a little quieter than the others. The gentlest voice.",
+    "voice": "en_US-sam-medium",
+    "flatten": false,
+    "lengthScale": 1.2,
+    "noiseScale": 0.45,
+    "noiseW": 0.6,
+    "sentenceSilence": 0.6,
+    "effects": {
+      "highpass": 70,
+      "lowpass": 7500,
+      "presence": { "freq": 1500, "gain": -1 },
+      "compress": { "threshold": -26, "ratio": 2 },
+      "loudness": -18
+    }
+  },
+  "calder": {
+    "about": "Captain Calder: deep, measured and resonant, with a little room around the voice.",
+    "voice": "en_GB-vctk-medium",
+    "speaker": 76,
+    "flatten": true,
+    "lengthScale": 1.12,
+    "noiseScale": 0.45,
+    "noiseW": 0.6,
+    "sentenceSilence": 0.5,
+    "effects": {
+      "pitch": 0.97,
+      "highpass": 70,
+      "lowpass": 9000,
+      "presence": { "freq": 1700, "gain": 2 },
+      "compress": { "threshold": -22, "ratio": 3 },
+      "echo": { "delay": 45, "decay": 0.12 },
       "loudness": -16
     }
   },
   "plain": {
-    "about": "The same voice with no effects: for comparing, or when the character isn't wanted.",
+    "about": "Flatline's voice with no effects: for comparing, or when no character is wanted.",
     "voice": "en_US-libritts_r-medium",
     "speaker": 137,
     "lengthScale": 1.0,

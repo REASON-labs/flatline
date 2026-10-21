@@ -6,7 +6,8 @@
 #
 # Needs Node 20+ (already there if a Flatline app runs on the box) and installs ffmpeg. Safe to
 # re-run: pinned downloads are checked and kept, the service code is updated, and your presets
-# (/etc/flatline/voice-presets.json) are left alone. Settings (all optional):
+# (/etc/flatline/voice-presets.json) are kept: presets you have are never changed, and new ones
+# (a new character) are added beside them, after a dated backup. Settings (all optional):
 #   FLATLINE_VOICE_PORT      loopback port (default 8087)
 #   FLATLINE_VOICE_EXTRA     more Piper voices to fetch, e.g. "en_US-joe-medium en_US-bryce-medium"
 #                            (from the same pinned revision; for trying voices out)
@@ -31,12 +32,21 @@ declare -A PIPER_SHA=(
   [x86_64]=a50cb45f355b7af1f6d758c1b360717877ba0a398cc8cbe6d2a7a3a26e225992
   [aarch64]=fea0fd2d87c54dbc7078d0f878289f404bd4d6eea6e7444a77835d1537ab88eb
 )
-# Pinned: the voices repository at one revision, and the default voice's files by SHA-256.
+# Pinned: the voices repository at one revision, and the cast's voices (the ones the shipped
+# presets use, docs/VOICE.md#licences) by SHA-256.
 VOICES_REV=c10ece1aade47bb51c153c893d14e5bf8e5b7117
-DEFAULT_VOICE=en_US-libritts_r-medium
+CAST_VOICES="en_US-libritts_r-medium en_US-kristin-medium en_GB-cori-medium en_GB-vctk-medium en_US-sam-medium"
 declare -A VOICE_SHA=(
   [en_US-libritts_r-medium.onnx]=10bb85e071d616fcf4071f369f1799d0491492ab3c5d552ec19fb548fac13195
   [en_US-libritts_r-medium.onnx.json]=b471dc60d2d8335e819c393d196d6fbf792817f40051257b269878505bc9afb3
+  [en_US-kristin-medium.onnx]=5849957f929cbf720c258f8458692d6103fff2f0e3d3b19c8259474bb06a18d4
+  [en_US-kristin-medium.onnx.json]=5681426d4aead22195de70531eeeeddb46493cfaffc5764b2ea3db73428b651c
+  [en_GB-cori-medium.onnx]=1899f98e5fb8310154f3c2973f4b8a929ba7245e722b3d3a85680b833d95f10d
+  [en_GB-cori-medium.onnx.json]=e262c16d7f192f69d4edd6b4ef8a5915379e67495fcc402f1ab15eeb33da3d36
+  [en_GB-vctk-medium.onnx]=4e9fc85ab9009385319fc6bae7f55577f8a2d7ee77fd9159a5500eb6531f41e6
+  [en_GB-vctk-medium.onnx.json]=7f85e6391ed0f7f46e4abd19345929a16be931a0c9945086f96692dce2087fa8
+  [en_US-sam-medium.onnx]=56417b3b4afe8ec6bb4cabf06e17d67261fdd5bf334592abcfc80052fba11163
+  [en_US-sam-medium.onnx.json]=8c7fb47f19683b0b81037c5564f9a5ad4699a9da685e0e5da0a72fd3c3f5c1c4
 )
 
 [[ "$PORT" =~ ^[0-9]+$ ]] || { echo "FLATLINE_VOICE_PORT must be a number" >&2; exit 1; }
@@ -83,7 +93,7 @@ voice_url() {
   lang="${name%%-*}"; rest="${name#*-}"; quality="${rest##*-}"; speaker="${rest%-*}"
   echo "https://huggingface.co/rhasspy/piper-voices/resolve/$VOICES_REV/${lang%%_*}/$lang/$speaker/$quality/$file"
 }
-for v in "$DEFAULT_VOICE" $EXTRA; do
+for v in $CAST_VOICES $EXTRA; do
   [[ "$v" =~ ^[a-z]{2}_[A-Z]{2}-[a-z0-9_]+-(x_low|low|medium|high)$ ]] || { echo "Not a Piper voice name: $v" >&2; exit 1; }
   echo "Voice $v..."
   for f in "$v.onnx" "$v.onnx.json"; do fetch "$(voice_url "$v" "$f")" "$VOICES/$f" "${VOICE_SHA[$f]:-}"; done
@@ -92,10 +102,16 @@ chown -R "$USER_NAME:$USER_NAME" "$VOICES"
 
 echo "The service..."
 install -d -m 0755 "$PREFIX/voice"
-install -m 0644 "$HERE/voice/server.mjs" "$HERE/voice/chain.mjs" "$HERE/voice/flatten.mjs" "$HERE/voice/presets.json" "$PREFIX/voice/"
+install -m 0644 "$HERE/voice/server.mjs" "$HERE/voice/chain.mjs" "$HERE/voice/flatten.mjs" "$HERE/voice/merge-presets.mjs" "$HERE/voice/presets.json" "$PREFIX/voice/"
 if [ ! -s "$PRESETS" ] || [ "${FLATLINE_VOICE_RESET_PRESETS:-0}" = 1 ]; then
   [ -s "$PRESETS" ] && cp "$PRESETS" "$PRESETS.$(date +%Y%m%d%H%M%S).bak"
   install -m 0644 "$HERE/voice/presets.json" "$PRESETS"
+else
+  # Yours are kept as they are; presets that are new in this release are added (backup first).
+  STAMP="$(date +%Y%m%d%H%M%S)"
+  cp "$PRESETS" "$PRESETS.$STAMP.bak"
+  "$NODE" "$PREFIX/voice/merge-presets.mjs" "$PRESETS" "$HERE/voice/presets.json"
+  cmp -s "$PRESETS" "$PRESETS.$STAMP.bak" && rm -f "$PRESETS.$STAMP.bak"
 fi
 
 cat > "/etc/systemd/system/$SERVICE.service" <<UNIT
@@ -113,6 +129,7 @@ Environment=FLATLINE_VOICE_PORT=$PORT
 Environment=PIPER_BIN=$PREFIX/piper/piper
 Environment=FLATLINE_VOICES_DIR=$VOICES
 Environment=FLATLINE_VOICE_PRESETS=$PRESETS
+Environment=FLATLINE_VOICE_MAX_PIPERS=${FLATLINE_VOICE_MAX_PIPERS:-4}
 ExecStart=$NODE $PREFIX/voice/server.mjs
 Restart=on-failure
 RestartSec=5

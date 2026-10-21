@@ -11,20 +11,23 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const work = await mkdtemp(join(tmpdir(), "flatline-voice-"));
 const LOG = join(work, "calls.log");
 await writeFile(join(work, "presets.json"), JSON.stringify({
-  dixie: { voice: "en_US-test-medium", speaker: 7, lengthScale: 1.2, effects: { pitch: 0.9, drive: 6, lowpass: 5000 } },
+  flatline: { voice: "en_US-test-medium", speaker: 7, lengthScale: 1.2, effects: { pitch: 0.9, drive: 6, lowpass: 5000 } },
+  dixie: { sameAs: "flatline" },
   plain: { voice: "en_US-test-medium", effects: {} },
   flat: { voice: "en_US-test-medium", flatten: true, effects: {} },
+  slow: { voice: "en_US-test-medium", speaker: 3, lengthScale: 1.6, effects: {} },
+  ghost: { sameAs: "nobody" },
   "bad name!": { voice: "x" },
   sneaky: { voice: "../../etc/passwd" },
 }));
 Object.assign(process.env, {
   NODE_ENV: "test", FAKE_LOG: LOG, FLATLINE_VOICE_QUEUE: "3",
   PIPER_BIN: join(HERE, "fixtures/fake-piper.mjs"), FFMPEG_BIN: join(HERE, "fixtures/fake-ffmpeg.mjs"),
-  FLATLINE_VOICES_DIR: work, FLATLINE_VOICE_PRESETS: join(work, "presets.json"), FLATLINE_VOICE_MAX_CHARS: "200",
+  FLATLINE_VOICES_DIR: work, FLATLINE_VOICE_PRESETS: join(work, "presets.json"), FLATLINE_VOICE_MAX_CHARS: "200", FLATLINE_VOICE_MAX_PIPERS: "2",
 });
 const { buildFilter, mergeEffects, FORMATS } = await import("../server/voice/chain.mjs");
 const { flatten } = await import("../server/voice/flatten.mjs");
-const { createVoiceServer, loadPresets, cleanText, stopPipers } = await import("../server/voice/server.mjs");
+const { createVoiceServer, loadPresets, cleanText, stopPipers, defaultPreset, piperKey, runningPipers } = await import("../server/voice/server.mjs");
 const { createSpeaker } = await import("../dist/server/index.js");
 
 let server, url;
@@ -74,7 +77,7 @@ test("formats and content types", () => {
 
 test("cleanText and loadPresets: one line of text; bad preset names and voice paths dropped", () => {
   assert.equal(cleanText("  Hello\n\tthere\u0007 you "), "Hello there you");
-  assert.deepEqual(Object.keys(loadPresets()).sort(), ["dixie", "flat", "plain"]);
+  assert.deepEqual(Object.keys(loadPresets()).sort(), ["dixie", "flat", "flatline", "plain", "slow"]);
 });
 
 // --- the service, with stand-ins ------------------------------------------------------------
@@ -123,7 +126,7 @@ test("refusals: empty, too long, unknown preset, unknown format, not JSON, wrong
 
 test("GET / lists presets and formats", async () => {
   const b = await (await fetch(`${url}/`)).json();
-  assert.deepEqual([b.ok, b.presets.sort(), b.formats], [true, ["dixie", "flat", "plain"], ["m4a", "mp3", "ogg", "wav"]]);
+  assert.deepEqual([b.ok, b.presets.sort(), b.formats], [true, ["dixie", "flat", "flatline", "plain", "slow"], ["m4a", "mp3", "ogg", "wav"]]);
 });
 
 test("one at a time, with a short queue: past it, \"busy\"", async () => {
@@ -150,11 +153,11 @@ test("createSpeaker: audio back, with its type", async () => {
   assert.equal(r.ok, true);
   assert.equal(r.contentType, "audio/mpeg");
   assert.ok(r.audio.byteLength > 44 && r.ms >= 0);
-  assert.deepEqual((await s.presets()).sort(), ["dixie", "flat", "plain"]);
+  assert.deepEqual((await s.presets()).sort(), ["dixie", "flat", "flatline", "plain", "slow"]);
   assert.equal(await s.health(), true);
 });
 
-test("createSpeaker: m4a by default, and the dixie preset", async () => {
+test("createSpeaker: m4a by default, and the default preset (flatline)", async () => {
   const r = await createSpeaker({ url }).speak("Default.");
   assert.equal(r.contentType, "audio/mp4");
   const line = (await calls()).findLast((c) => c.line).line;
@@ -213,4 +216,46 @@ test("a preset with flatten shapes the text before Piper; a request can turn it 
   assert.equal(await lastLine(), "Listen up. You have work.");
   await fetch(`${url}/speak`, { method: "POST", body: JSON.stringify({ text: "Listen up, you have work!", preset: "plain", format: "wav", flatten: "yes" }) });
   assert.equal(await lastLine(), "Listen up, you have work!");   // only true/false count
+});
+
+// --- the cast's presets: other names, the default, and sharing Pipers ------------------------------
+
+test("an other name (sameAs) is the same preset; one that points nowhere is dropped", () => {
+  const p = loadPresets();
+  assert.equal(p.dixie, p.flatline);
+  assert.equal("ghost" in p, false);
+});
+
+test("the default preset is flatline, else dixie, else the first", () => {
+  assert.equal(defaultPreset({ plain: {}, dixie: {}, flatline: {} }), "flatline");
+  assert.equal(defaultPreset({ plain: {}, dixie: {} }), "dixie");
+  assert.equal(defaultPreset({ plain: {} }), "plain");
+  return fetch(`${url}/`).then((r) => r.json()).then((b) => assert.equal(b.default, "flatline"));
+});
+
+test("dixie still speaks, as flatline, through flatline's own Piper", async () => {
+  const before = (await calls()).filter((c) => c.piper).length;
+  const r = await fetch(`${url}/speak`, { method: "POST", body: JSON.stringify({ text: "Old name.", preset: "dixie", format: "wav" }) });
+  assert.equal(r.status, 200);
+  assert.equal((await calls()).findLast((c) => c.line).line.speaker_id, 7);
+  assert.equal((await calls()).filter((c) => c.piper).length, before, "no new Piper for an other name");
+});
+
+test("presets with the same voice and pace share a Piper; the speaker is per line", () => {
+  assert.equal(piperKey({ voice: "v", speaker: 1, lengthScale: 1.1 }), piperKey({ voice: "v", speaker: 9, lengthScale: 1.1 }));
+  assert.notEqual(piperKey({ voice: "v", lengthScale: 1.1 }), piperKey({ voice: "v", lengthScale: 1.2 }));
+  assert.notEqual(piperKey({ voice: "v" }), piperKey({ voice: "w" }));
+});
+
+test("at most FLATLINE_VOICE_MAX_PIPERS run: the least recently used one stops first", async () => {
+  const say = (preset) => fetch(`${url}/speak`, { method: "POST", body: JSON.stringify({ text: "Count.", preset, format: "wav" }) });
+  await say("flatline"); await say("plain"); await say("slow");
+  assert.equal(runningPipers(), 2);
+  const starts = () => calls().then((l) => l.filter((c) => c.piper).length);
+  const n = await starts();
+  await say("slow"); await say("plain");     // both running: no new Piper
+  assert.equal(await starts(), n);
+  await say("flatline");                      // stopped earlier: starts again
+  assert.equal(await starts(), n + 1);
+  assert.equal(runningPipers(), 2);
 });
