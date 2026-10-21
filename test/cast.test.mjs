@@ -138,3 +138,10 @@ test("merge: nothing they have changes; nothing new, nothing added", () => {
   assert.deepEqual(added, []);
   assert.deepEqual(merged, theirs);
 });
+
+test("LATER: every voice says when the reminder comes back, and has a line for nothing to push", () => {
+  for (const L of [...CAST.map((c) => linesFor(c)), plainLines]) {
+    assert.match(L.inbox.later, /\{time\}/);
+    assert.ok(L.inbox.nothingToPush.length > 0);
+  }
+});

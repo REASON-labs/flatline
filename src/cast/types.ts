@@ -90,6 +90,10 @@ export interface LineSet {
     nothingWaiting: string;
     dropped: string;
     nothingToDrop: string;
+    /** After LATER: the last reminder comes again at {time}. */
+    later: string;
+    /** LATER, with no recent reminder to push back. */
+    nothingToPush: string;
     nothingFound: string;
     switchedOff: string;
     tooMany: string;
