@@ -111,6 +111,23 @@
       "loudness": -16
     }
   },
+  "nettle": {
+    "about": "Nettle: brisk and expressive, a little bright at the edges, clean. Shares plain's pace, so it shares plain's Piper.",
+    "voice": "en_US-libritts_r-medium",
+    "speaker": 480,
+    "flatten": true,
+    "lengthScale": 1.0,
+    "noiseScale": 0.667,
+    "noiseW": 0.8,
+    "sentenceSilence": 0.25,
+    "effects": {
+      "highpass": 90,
+      "lowpass": 9500,
+      "presence": { "freq": 2400, "gain": 2 },
+      "compress": { "threshold": -22, "ratio": 3 },
+      "loudness": -16
+    }
+  },
   "plain": {
     "about": "Flatline's voice with no effects: for comparing, or when no character is wanted.",
     "voice": "en_US-libritts_r-medium",

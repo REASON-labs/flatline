@@ -1,7 +1,7 @@
 {
   "name": "flatline",
-  "version": "0.3.3",
-  "description": "Self-hosted voice for web apps: speech-to-text (whisper.cpp) and text-to-speech (Piper) on your own server, recording that stops on silence, and a cast of voice characters (Flatline, Kestrel, Iris, Ashford, Hoshi and Captain Calder), each a sound, a tone and a set of lines. The audio never leaves your box.",
+  "version": "0.3.4",
+  "description": "Self-hosted voice for web apps: speech-to-text (whisper.cpp) and text-to-speech (Piper) on your own server, recording that stops on silence, and a cast of voice characters (Flatline, Kestrel, Iris, Ashford, Hoshi, Captain Calder and Nettle), each a sound, a tone and a set of lines. The audio never leaves your box.",
   "license": "MIT",
   "type": "module",
   "exports": {

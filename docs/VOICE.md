@@ -6,7 +6,7 @@ its sound with ffmpeg. It listens on **127.0.0.1:8087** only. Text goes to it an
 back; nothing is sent anywhere else.
 
 Each **character** in the cast ([CAST.md](CAST.md)) has a preset: **flatline** (the default), **kestrel**,
-**iris**, **ashford**, **hoshi** and **calder**, plus **plain** (Flatline's voice with no effects).
+**iris**, **ashford**, **hoshi**, **calder** and **nettle**, plus **plain** (Flatline's voice with no effects).
 **flatline** is a deep voice, slow and deliberate, pitched down, compressed, with grit and a faint
 line or radio colour, still clear on a phone speaker. It was called **dixie** before 0.3.0; `dixie`
 still works, as another name for it. None of them imitates a real person's voice: each is a stock
@@ -165,7 +165,7 @@ downloads them from their publishers, and the service runs Piper as a separate p
 | Piper 2023.11.14-2 (rhasspy/piper) | MIT | the last MIT release; development continues as piper1-gpl (GPL-3.0), not used here |
 | espeak-ng (inside Piper's download) | GPL-3.0 | Piper uses it to turn text into phonemes; it runs inside Piper's own process |
 | Piper voice models (rhasspy/piper-voices) | MIT (the models) | each voice is trained on a dataset with its own licence, below |
-| `en_US-libritts_r-medium` (flatline, plain) | CC BY 4.0 (LibriTTS-R) | free to use, commercially too, **with credit**: "Voice: Piper en_US-libritts_r, trained on LibriTTS-R (CC BY 4.0)" |
+| `en_US-libritts_r-medium` (flatline and plain: speaker 137, nettle: speaker 480) | CC BY 4.0 (LibriTTS-R) | free to use, commercially too, **with credit**: "Voice: Piper en_US-libritts_r, trained on LibriTTS-R (CC BY 4.0)" |
 | `en_US-kristin-medium` (kestrel) | public domain (LibriVox) | |
 | `en_GB-cori-medium` (iris) | public domain (LibriVox) | |
 | `en_GB-vctk-medium` (ashford: speaker 95, calder: speaker 76) | CC BY 4.0 (CSTR VCTK Corpus) | commercially too, **with credit**: "Voice: Piper en_GB-vctk, trained on the CSTR VCTK Corpus (CC BY 4.0)" |
@@ -175,7 +175,7 @@ downloads them from their publishers, and the service runs Piper as a separate p
 | ffmpeg (Ubuntu's package) | LGPL/GPL | a separate program the service runs |
 
 Each licence above is the one stated in that voice's MODEL_CARD in rhasspy/piper-voices (pinned
-revision `c10ece1`), checked on 2026-10-21. Voices with non-commercial licences (`en_US-ryan`,
+revision `c10ece1`), checked on 2026-10-21 (libritts_r again on 2026-10-22, for nettle). Voices with non-commercial licences (`en_US-ryan`,
 `en_US-hfc_male`, `en_US-hfc_female`, `en_US-l2arctic`, `en_GB-semaine` among them) are deliberately
 not used, and nor are voices whose card only says "see URL" without a clear licence
 (`en_GB-alan`, `en_GB-jenny_dioco`, `en_US-amy`, `en_US-kusal`, `en_US-arctic`, `en_US-lessac`).

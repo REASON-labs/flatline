@@ -16,7 +16,8 @@ const isText = (k) => TEXT_KEYS.has(k) || k.startsWith("inbox.") || k === "wake.
 /** Catchphrases and names that would make a character an imitation. */
 const BANNED = [/make it so/i, /\bengage\b/i, /captain's log/i, /\bdave\b/i, /i'm afraid/i, /pod bay/i, /satisfied with your care/i,
   /healthcare companion/i, /scale of one to ten/i, /at your service/i, /\bsir\b/i, /\bmadam\b/i, /jarvis/i, /baymax/i, /\bhal\b/i,
-  /picard/i, /\bmajor\b/i, /motoko/i, /\bdixie\b/i, /\bdaisy\b/i];
+  /picard/i, /\bmajor\b/i, /motoko/i, /\bdixie\b/i, /\bdaisy\b/i,
+  /shego/i, /kim possible/i, /\bkimmie\b/i, /princess/i, /plasma/i, /\bglow/i, /villain/i, /sidekick/i, /drakken/i, /pumpkin/i];
 /** Shaming, guilt and counting misses. */
 const UNKIND = [/streak/i, /lazy/i, /disappoint/i, /shame/i, /guilt/i, /\bfail/i, /\bmissed\b/i, /\bbehind\b/i, /\bagain\?/i, /should have/i, /pathetic/i, /useless/i];
 
@@ -24,8 +25,8 @@ const entries = (lines) => Object.entries(lines).flatMap(([group, v]) => Object.
 const KEYS = entries(plainLines).map(([k]) => k);
 const all = [...CAST.map((c) => [c.id, c.lines]), ["plain", plainLines]];
 
-test("six characters, Flatline first and the default, ids unique and lowercase", () => {
-  assert.deepEqual(CAST.map((c) => c.id), ["flatline", "kestrel", "iris", "ashford", "hoshi", "calder"]);
+test("seven characters, Flatline first and the default, ids unique and lowercase", () => {
+  assert.deepEqual(CAST.map((c) => c.id), ["flatline", "kestrel", "iris", "ashford", "hoshi", "calder", "nettle"]);
   assert.equal(DEFAULT_CHARACTER, "flatline");
   assert.equal(CAST[0].id, DEFAULT_CHARACTER);
   for (const c of CAST) assert.match(c.id, /^[a-z][a-z0-9-]*$/);

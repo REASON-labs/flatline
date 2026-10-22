@@ -2,7 +2,7 @@
 
 A five-minute guide to changing how a character sounds on your server. The examples use Flatline
 (the `flatline` preset); every character works the same way (`kestrel`, `iris`, `ashford`, `hoshi`,
-`calder`, and `plain`). You'll need a shell on the server
+`calder`, `nettle`, and `plain`). You'll need a shell on the server
 (examples use `you@your-server`) and `sudo`.
 
 ## Where the settings are

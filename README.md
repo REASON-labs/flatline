@@ -14,8 +14,8 @@ Small pieces, no runtime dependencies:
 | **`flatline/cast`** | anywhere (data) | **the cast**: six voice characters, each a sound (a preset), a tone guide for an assistant model, and a line set (briefings, reminders, wake-up calls, replies). [docs/CAST.md](docs/CAST.md) |
 
 Named for the Dixie Flatline in *Neuromancer*: a voice in the machine that talks back. Since 0.3
-she is **Flatline**, the default character of a cast: Flatline, Kestrel, Iris, Ashford, Hoshi and
-Captain Calder (original characters, each only inspired by one from a story).
+she is **Flatline**, the default character of a cast: Flatline, Kestrel, Iris, Ashford, Hoshi,
+Captain Calder and Nettle (original characters, each only inspired by one from a story).
 `flatline/server` also has `createSpeaker()`, for the voice: text in, M4A/MP3/Ogg/WAV out.
 
 ## How it fits together
@@ -34,12 +34,12 @@ Whisper listens on loopback only.
 ## Install
 
 ```jsonc
-"dependencies": { "flatline": "github:REASON-labs/flatline#v0.3.3" }
+"dependencies": { "flatline": "github:REASON-labs/flatline#v0.3.4" }
 ```
 
 The built code is committed, so installing needs no build and no dev tools; pin a tag. A server
 that can't read the repository can use the tarball attached to each release instead
-(`"flatline": "file:vendor/flatline-0.3.3.tgz"`). See [docs/INTEGRATION.md](docs/INTEGRATION.md).
+(`"flatline": "file:vendor/flatline-0.3.4.tgz"`). See [docs/INTEGRATION.md](docs/INTEGRATION.md).
 
 ## Quick start
 

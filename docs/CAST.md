@@ -21,6 +21,7 @@ a real actor's voice, and none uses a famous catchphrase or quote.
 | `ashford` | Ashford | dry English butler, efficient, quietly witty | JARVIS (the *Iron Man* films) | `en_GB-vctk-medium` speaker 95 (CC BY 4.0) | on |
 | `hoshi` | Hoshi | soft, warm caretaker: the gentlest | Baymax (*Big Hero 6*) | `en_US-sam-medium` (Apache-2.0) | off |
 | `calder` | Captain Calder | calm command, measured and decisive | a starship captain of the Picard kind | `en_GB-vctk-medium` speaker 76 (CC BY 4.0) | on |
+| `nettle` | Nettle | sarcastic, bored-cool, bossy: a best friend who rolls her eyes and is on your side | Shego (*Kim Possible*), with no names or references | `en_US-libritts_r-medium` speaker 480 (CC BY 4.0) | on |
 
 `dixie` is Flatline's old name: `character("dixie")` is Flatline, and the `dixie` preset is
 `{ "sameAs": "flatline" }`. With no character, an app uses `plainLines` and the `plain` preset.

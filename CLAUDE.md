@@ -4,8 +4,8 @@ Self-hosted voice for web apps: `server/install.sh` (whisper.cpp on loopback, :8
 `server/install-voice.sh` (Piper + ffmpeg presets on loopback, :8087, `server/voice/`),
 `flatline/server` (createTranscriber, createSpeaker), `flatline/browser` (record until silence,
 upload, and `dixie`, the speaker: the server's voice or the phone's), and `flatline/cast` (the
-voice characters: Flatline, the default and once called Dixie, Kestrel, Iris, Ashford, Hoshi and
-Captain Calder; each a preset, a tone guide and a line set; docs/CAST.md).
+voice characters: Flatline, the default and once called Dixie, Kestrel, Iris, Ashford, Hoshi,
+Captain Calder and Nettle; each a preset, a tone guide and a line set; docs/CAST.md).
 The repository will be **public**: no personal hosts, names, addresses or app-specific wording.
 Apps that use it (Mindtop and its forks) keep only a thin adapter; anything reusable lives here.
 

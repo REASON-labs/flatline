@@ -3,10 +3,10 @@
 // messages an app sends: briefings, reminders, the wake-up escalation, replies to messages).
 // Plain data and two small functions, so an app's server and its pages can both read it.
 // docs/CAST.md has the cast, the rules, and how to add a character.
-import { flatline, kestrel, iris, ashford, hoshi, calder, plainLines } from "./characters.js";
+import { flatline, kestrel, iris, ashford, hoshi, calder, nettle, plainLines } from "./characters.js";
 export { plainLines };
 /** Every character, in the order a picker shows them. The first is the default. */
-export const CAST = [flatline, kestrel, iris, ashford, hoshi, calder];
+export const CAST = [flatline, kestrel, iris, ashford, hoshi, calder, nettle];
 /** The default character. */
 export const DEFAULT_CHARACTER = "flatline";
 /** Old ids that still work: Flatline was called Dixie before 0.3.0. */

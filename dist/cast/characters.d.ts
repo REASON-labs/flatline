@@ -5,5 +5,6 @@ export declare const iris: Character;
 export declare const ashford: Character;
 export declare const hoshi: Character;
 export declare const calder: Character;
+export declare const nettle: Character;
 /** No character: plain, friendly wording, for "None (plain)" and as the fallback. */
 export declare const plainLines: LineSet;
