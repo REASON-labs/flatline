@@ -5,6 +5,15 @@ export declare const ANSWER_DEFAULTS: {
     readonly silenceMs: 1500;
     readonly noSpeechMs: 8000;
 };
+/**
+ * Tuned for a memo: a few things said in one go, with thinking pauses. Up to three minutes, ended
+ * by 2.5 s of quiet (a breath, not the end), given up after 10 s of nothing at the start.
+ */
+export declare const MEMO_DEFAULTS: {
+    readonly maxMs: 180000;
+    readonly silenceMs: 2500;
+    readonly noSpeechMs: 10000;
+};
 export type RecordingResult = {
     ok: true;
     audio: Blob;
@@ -42,3 +51,10 @@ export declare function canRecord(): boolean;
  * does something.
  */
 export declare function record(opts?: RecordOptions): Recording;
+/**
+ * Record a memo: the same recorder with MEMO_DEFAULTS (three minutes, a longer pause before it
+ * stops). A person who talks on past the limit gets `reason: "max"` with everything up to it; the
+ * app can say so and offer a second memo. The app's server should allow the bigger upload (a
+ * three-minute memo is a few MB) and a longer transcription timeout; see docs/INTEGRATION.md.
+ */
+export declare function recordMemo(opts?: RecordOptions): Recording;

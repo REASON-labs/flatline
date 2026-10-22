@@ -6,6 +6,11 @@ import { hush } from "./dixie.js";
 
 /** Tuned for a spoken answer: up to a minute, ended by 1.5 s of quiet, given up after 8 s of nothing. */
 export const ANSWER_DEFAULTS = { maxMs: 60_000, silenceMs: 1500, noSpeechMs: 8000 } as const;
+/**
+ * Tuned for a memo: a few things said in one go, with thinking pauses. Up to three minutes, ended
+ * by 2.5 s of quiet (a breath, not the end), given up after 10 s of nothing at the start.
+ */
+export const MEMO_DEFAULTS = { maxMs: 180_000, silenceMs: 2500, noSpeechMs: 10_000 } as const;
 
 export type RecordingResult =
   | { ok: true; audio: Blob; type: string; ms: number; reason: StopReason | "stopped" }
@@ -170,4 +175,14 @@ export function record(opts: RecordOptions = {}): Recording {
     cancel: () => end("cancelled"),
     done,
   };
+}
+
+/**
+ * Record a memo: the same recorder with MEMO_DEFAULTS (three minutes, a longer pause before it
+ * stops). A person who talks on past the limit gets `reason: "max"` with everything up to it; the
+ * app can say so and offer a second memo. The app's server should allow the bigger upload (a
+ * three-minute memo is a few MB) and a longer transcription timeout; see docs/INTEGRATION.md.
+ */
+export function recordMemo(opts: RecordOptions = {}): Recording {
+  return record({ ...MEMO_DEFAULTS, ...opts });
 }

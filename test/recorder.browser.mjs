@@ -54,6 +54,8 @@ test("answers are tuned for speech: 60 s at most, 1.5 s of quiet ends it", async
   const p = await page();
   const d = await p.evaluate(async () => (await import("/dist/browser/index.js")).ANSWER_DEFAULTS);
   assert.deepEqual(d, { maxMs: 60000, silenceMs: 1500, noSpeechMs: 8000 });
+  const m = await p.evaluate(async () => (await import("/dist/browser/index.js")).MEMO_DEFAULTS);
+  assert.deepEqual(m, { maxMs: 180000, silenceMs: 2500, noSpeechMs: 10000 });
 });
 
 test("stop() keeps what was said; cancel() throws it away", { timeout: 60_000 }, async () => {
@@ -135,4 +137,22 @@ test("no Web Audio at all: it still records, and stop() keeps it", { timeout: 60
   });
   assert.deepEqual([r.ok, r.reason], [true, "stopped"]);
   assert.ok(r.size > 0);
+});
+
+test("a memo: the same recorder with a longer pause before it stops, and options still win", { timeout: 60_000 }, async () => {
+  const p = await page();
+  const r = await p.evaluate(async () => {
+    const { recordMemo } = await import("/dist/browser/index.js");
+    // The fake mic speaks 1.2 s then goes quiet: a memo waits 2.5 s of quiet, so it ends later than an answer would.
+    const { record } = await import("/dist/browser/index.js");
+    const out = await recordMemo({ onLevel: () => {} }).done;
+    const answer = await record().done;
+    const capped = await recordMemo({ maxMs: 1500 }).done;
+    return { ok: out.ok, reason: out.reason, ms: out.ms, answerMs: answer.ms, cappedReason: capped.reason, cappedMs: capped.ms };
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.reason, "silence");
+  assert.ok(r.ms - r.answerMs >= 700, `a memo waits about a second longer after the speech than an answer: ${r.ms} vs ${r.answerMs} ms`);
+  assert.equal(r.cappedReason, "max");
+  assert.ok(r.cappedMs < 2500, `maxMs still caps it: ${r.cappedMs}`);
 });

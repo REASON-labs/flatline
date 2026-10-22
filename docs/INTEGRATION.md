@@ -8,7 +8,7 @@ reachable from outside the server.
 
 ```jsonc
 // package.json: once the repository is public, or wherever your server can read it
-"dependencies": { "flatline": "github:REASON-labs/flatline#v0.3.4" }
+"dependencies": { "flatline": "github:REASON-labs/flatline#v0.4.0" }
 ```
 
 The built code is committed, so installing needs no build step and no dev tools. Pin a tag.
@@ -18,7 +18,7 @@ release's tarball instead (it's attached to each GitHub release, or made with `n
 in your repository:
 
 ```jsonc
-"dependencies": { "flatline": "file:vendor/flatline-0.3.4.tgz" }
+"dependencies": { "flatline": "file:vendor/flatline-0.4.0.tgz" }
 ```
 
 and make sure your deploy copies `vendor/` to the server before `npm ci`.
@@ -64,10 +64,10 @@ whatever status call the app already makes), so it can hide the mic instead of f
 
 | | Suggested | Why |
 |---|---|---|
-| Recording length | 60 s (the browser's default for answers) | a spoken answer, not a podcast |
-| Body size | 5 MB | a minute is 0.2 to 1 MB depending on the phone |
+| Recording length | 60 s (the browser's default for answers); 180 s for a memo (`recordMemo()`) | a spoken answer, not a podcast; a memo says a few things |
+| Body size | 5 MB for answers; 10 MB if you take memos | a minute is 0.2 to 1 MB depending on the phone |
 | Rate | about 20 per person per 10 minutes | each one keeps a CPU busy for seconds |
-| Timeout | 60 s | the default model takes a few seconds for a short answer |
+| Timeout | 60 s for answers; 120 s for memos | the default model takes a few seconds for a short answer, and longer in proportion |
 
 ### Errors to show
 

@@ -5,6 +5,11 @@ import { SilenceDetector, rms } from "./silence.js";
 import { hush } from "./dixie.js";
 /** Tuned for a spoken answer: up to a minute, ended by 1.5 s of quiet, given up after 8 s of nothing. */
 export const ANSWER_DEFAULTS = { maxMs: 60_000, silenceMs: 1500, noSpeechMs: 8000 };
+/**
+ * Tuned for a memo: a few things said in one go, with thinking pauses. Up to three minutes, ended
+ * by 2.5 s of quiet (a breath, not the end), given up after 10 s of nothing at the start.
+ */
+export const MEMO_DEFAULTS = { maxMs: 180_000, silenceMs: 2500, noSpeechMs: 10_000 };
 /** Formats in order of preference: Chrome and Firefox record webm/ogg Opus, Safari mp4 (AAC). */
 const PREFERRED = ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus", "audio/webm", "audio/aac"];
 /** The best format this browser can record, or "" to let it choose. Pure, for tests. */
@@ -179,5 +184,14 @@ export function record(opts = {}) {
         cancel: () => end("cancelled"),
         done,
     };
+}
+/**
+ * Record a memo: the same recorder with MEMO_DEFAULTS (three minutes, a longer pause before it
+ * stops). A person who talks on past the limit gets `reason: "max"` with everything up to it; the
+ * app can say so and offer a second memo. The app's server should allow the bigger upload (a
+ * three-minute memo is a few MB) and a longer transcription timeout; see docs/INTEGRATION.md.
+ */
+export function recordMemo(opts = {}) {
+    return record({ ...MEMO_DEFAULTS, ...opts });
 }
 //# sourceMappingURL=recorder.js.map

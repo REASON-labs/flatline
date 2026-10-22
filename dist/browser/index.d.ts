@@ -1,4 +1,4 @@
-export { record, canRecord, pickMimeType, ANSWER_DEFAULTS } from "./recorder.js";
+export { record, recordMemo, canRecord, pickMimeType, ANSWER_DEFAULTS, MEMO_DEFAULTS } from "./recorder.js";
 export type { Recording, RecordingResult, RecordErrorCode, RecordOptions } from "./recorder.js";
 export { SilenceDetector, rms } from "./silence.js";
 export type { SilenceOptions, StopReason, ListenState } from "./silence.js";

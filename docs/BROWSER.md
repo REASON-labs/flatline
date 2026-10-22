@@ -39,6 +39,21 @@ const r = await record().done;   // or rec.done, from above
 | `cancelled` | you called `rec.cancel()` | nothing |
 | `failed` | anything else | offer typing |
 
+### A memo, not an answer
+
+An answer is a sentence; a memo is a few things said in one go, with pauses to think. `recordMemo()`
+is the same recorder with `MEMO_DEFAULTS`: three minutes at most, 2.5 s of quiet ends it (a breath
+doesn't), 10 s of nothing at the start gives up. Everything else is the same, options included.
+
+```js
+import { recordMemo } from "flatline/browser";
+const r = await recordMemo({ onLevel: meter }).done;
+if (r.ok && r.reason === "max") tell("That's the three-minute limit. Send another for the rest.");
+```
+
+Your server has to allow the bigger upload and a longer transcription (docs/INTEGRATION.md, Limits):
+a three-minute memo is a few MB, and whisper takes longer over it.
+
 ### How it decides you've stopped
 
 It measures loudness about 20 times a second and learns the room's background level from the

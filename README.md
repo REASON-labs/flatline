@@ -10,7 +10,7 @@ Small pieces, no runtime dependencies:
 | **Speech-to-text service** (`server/install.sh`) | your server | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) at a pinned release, as a hardened systemd service on loopback |
 | **`flatline/server`** | your app's backend (Node 20+) | sends audio to that service and returns clean text, with time and size limits and plain error codes |
 | **Text-to-speech service** (`server/install-voice.sh`) | your server | [Piper](https://github.com/rhasspy/piper) at a pinned release, with a preset per character that gives the voice its sound through ffmpeg |
-| **`flatline/browser`** | the phone's browser | records an answer and **stops by itself when the person stops talking**; sends it to your backend; and `dixie`, the speaker, which reads text aloud with the server's voice, or the phone's own when that isn't available |
+| **`flatline/browser`** | the phone's browser | records an answer (or a three-minute memo) and **stops by itself when the person stops talking**; sends it to your backend; and `dixie`, the speaker, which reads text aloud with the server's voice, or the phone's own when that isn't available |
 | **`flatline/cast`** | anywhere (data) | **the cast**: six voice characters, each a sound (a preset), a tone guide for an assistant model, and a line set (briefings, reminders, wake-up calls, replies). [docs/CAST.md](docs/CAST.md) |
 
 Named for the Dixie Flatline in *Neuromancer*: a voice in the machine that talks back. Since 0.3
@@ -34,12 +34,12 @@ Whisper listens on loopback only.
 ## Install
 
 ```jsonc
-"dependencies": { "flatline": "github:REASON-labs/flatline#v0.3.4" }
+"dependencies": { "flatline": "github:REASON-labs/flatline#v0.4.0" }
 ```
 
 The built code is committed, so installing needs no build and no dev tools; pin a tag. A server
 that can't read the repository can use the tarball attached to each release instead
-(`"flatline": "file:vendor/flatline-0.3.4.tgz"`). See [docs/INTEGRATION.md](docs/INTEGRATION.md).
+(`"flatline": "file:vendor/flatline-0.4.0.tgz"`). See [docs/INTEGRATION.md](docs/INTEGRATION.md).
 
 ## Quick start
 

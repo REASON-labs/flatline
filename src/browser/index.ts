@@ -1,6 +1,6 @@
-// flatline/browser: record an answer that stops on silence, send it for a transcript, and
-// Dixie, who reads text aloud.
-export { record, canRecord, pickMimeType, ANSWER_DEFAULTS } from "./recorder.js";
+// flatline/browser: record an answer (or a longer memo) that stops on silence, send it for a
+// transcript, and Dixie, who reads text aloud.
+export { record, recordMemo, canRecord, pickMimeType, ANSWER_DEFAULTS, MEMO_DEFAULTS } from "./recorder.js";
 export type { Recording, RecordingResult, RecordErrorCode, RecordOptions } from "./recorder.js";
 export { SilenceDetector, rms } from "./silence.js";
 export type { SilenceOptions, StopReason, ListenState } from "./silence.js";
