@@ -24,6 +24,9 @@ const firstWord = (s) => (s.trim().match(/^[A-Za-z0-9']+/)?.[0] ?? "").toLowerCa
 const lastWord = (s) => (s.trim().match(/[A-Za-z0-9']+$/)?.[0] ?? "").toLowerCase();
 const capitalise = (s) => s.replace(/^(\s*)([a-z])/, (_, sp, c) => sp + c.toUpperCase());
 
+/** Marks a full stop that was a clause comma (a shorter pause), until segments() splits on it. */
+const SOFT = "\uE000";
+
 /** One sentence (without its end mark), with clause commas made into full stops. */
 function flattenSentence(body) {
   const parts = body.split(/,\s+/);
@@ -36,7 +39,7 @@ function flattenSentence(body) {
     // Only a clear new clause (never after "and"/"or", never inside a number): a list item
     // doesn't start with a clause word, so lists are left as they are.
     if (!isNumber && CLAUSE_STARTERS.has(w) && lastWord(out) !== "and" && lastWord(out) !== "or") {
-      out = `${out}. ${capitalise(next.replace(/^i\b/, "I"))}`;
+      out = `${out}.${SOFT} ${capitalise(next.replace(/^i\b/, "I"))}`;
     } else {
       out = `${out}, ${next}`;
     }
@@ -46,6 +49,10 @@ function flattenSentence(body) {
 
 /** Text in, flatter text out. */
 export function flatten(text) {
+  return flattenMarked(text).replaceAll(SOFT, "");
+}
+
+function flattenMarked(text) {
   let t = String(text ?? "").replace(/\s+/g, " ").trim();
   if (!t) return t;
   // "!" (and "!!", "?!" keeps the question) becomes a full stop; a semicolon ends a clause too.
@@ -60,4 +67,52 @@ export function flatten(text) {
     return capitalise(flattenSentence(body).trim()) + (end || ".");
   });
   return shaped.join(" ").replace(/\s+([.?,])/g, "$1").replace(/\.{2,}/g, ".").trim();
+}
+
+// --- segments: where the pauses go --------------------------------------------------------
+// Piper puts the same pause after every sentence. A clause that flatten() turned into its own
+// sentence then sounds as if it were a new thought: choppy. So the service speaks one piece at
+// a time and sets the pause after each by what ended it.
+
+/** Pause kinds: after a clause that was a comma, a statement, a question. */
+export const PAUSES = ["clause", "stop", "question"];
+
+const ABBREVIATIONS = new Set(["mr", "mrs", "ms", "dr", "st", "jr", "sr", "vs", "etc", "e.g", "i.e", "no", "approx", "prof"]);
+/** The most pieces one request is split into (the rest stays in the last). */
+export const MAX_SEGMENTS = 24;
+
+/**
+ * Text in, pieces out: [{ text, pause }], where `pause` is the kind of pause after the piece
+ * ("clause", "stop" or "question"; the last piece's is never used). `flat` applies flatten().
+ * A full stop after an abbreviation ("Dr.", "e.g.") or a number, or a stop with no capital after
+ * it, doesn't split.
+ */
+export function segments(text, flat = false) {
+  const t = flat ? flattenMarked(text) : String(text ?? "").replace(/\s+/g, " ").trim();
+  const out = [];
+  const pieces = t.split(SOFT);
+  pieces.forEach((piece, pi) => {
+    const sentences = [];
+    let start = 0;
+    const re = /[.?!]+(?=\s+["'(]?[A-Z0-9])/g;
+    for (let m; (m = re.exec(piece));) {
+      const before = piece.slice(start, m.index).match(/[A-Za-z.]+$/)?.[0]?.toLowerCase().replace(/^\./, "") ?? "";
+      if (m[0] === "." && ABBREVIATIONS.has(before)) continue;
+      sentences.push(piece.slice(start, m.index + m[0].length).trim());
+      start = m.index + m[0].length;
+    }
+    const rest = piece.slice(start).trim();
+    if (rest) sentences.push(rest);
+    sentences.forEach((s, i) => {
+      const last = i === sentences.length - 1;
+      const pause = last && pi < pieces.length - 1 ? "clause" : /\?[^A-Za-z0-9]*$/.test(s) ? "question" : "stop";
+      if (s) out.push({ text: s, pause });
+    });
+  });
+  if (out.length > MAX_SEGMENTS) {
+    const head = out.slice(0, MAX_SEGMENTS - 1), tail = out.slice(MAX_SEGMENTS - 1);
+    head.push({ text: tail.map((x) => x.text).join(" "), pause: tail.at(-1).pause });
+    return head;
+  }
+  return out;
 }

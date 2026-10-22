@@ -254,3 +254,65 @@ test("endpoint: null uses the phone's voice even when configured", async () => {
   });
   assert.deepEqual(r, { out: "done", said: 1 });
 });
+
+// --- a refused play(), the unlock, and the choice not to fall back -------------------------------
+
+/** Chrome refuses sound no tap began: play() of anything but the silent unlock rejects. */
+function refuseUnlessUnlocked() {
+  const play = HTMLMediaElement.prototype.play;
+  HTMLMediaElement.prototype.play = function () {
+    if (this.src.startsWith("blob:") && !window.__tapped) return Promise.reject(new DOMException("play() failed: no user gesture", "NotAllowedError"));
+    return play.call(this);
+  };
+}
+
+test("unlock() is safe to call, and says it worked", async () => {
+  const p = await voicePage();
+  const r = await p.evaluate(async () => {
+    const { dixie } = await import("/dist/browser/index.js");
+    return [dixie.unlock(), dixie.unlock(), dixie.lastVoice()];
+  });
+  assert.deepEqual(r, [true, true, null]);
+});
+
+test("a play() the browser refuses is \"blocked\": not the phone's voice; asking again after a tap works", { timeout: 30_000 }, async () => {
+  const p = await voicePage();
+  await p.addInitScript(refuseUnlessUnlocked);
+  await p.goto(voiceSite.url);
+  const r = await p.evaluate(async () => {
+    const { dixie } = await import("/dist/browser/index.js");
+    dixie.configure({ endpoint: "/speak" });
+    const first = await dixie.speak("Nobody tapped.");
+    const voiceAfterBlock = dixie.lastVoice(), speakingAfter = dixie.speaking(), phoneSaid = window.__speech.said.length;
+    window.__tapped = true;
+    const second = await dixie.speak("Now they did.");
+    return { first, second, voiceAfterBlock, speakingAfter, phoneSaid, voice: dixie.lastVoice(), phoneSaidAfter: window.__speech.said.length };
+  });
+  assert.deepEqual(r, { first: "blocked", second: "done", voiceAfterBlock: null, speakingAfter: false, phoneSaid: 0, voice: "server", phoneSaidAfter: 0 });
+});
+
+test("fallback: false \u2014 when the server can't speak she says nothing instead of switching voice", { timeout: 30_000 }, async () => {
+  const p = await voicePage();
+  const r = await p.evaluate(async () => {
+    const { dixie } = await import("/dist/browser/index.js");
+    const a = await dixie.speak("Not on the phone.", { endpoint: "/speak-down", fallback: false });
+    dixie.configure({ fallback: false });
+    const b = await dixie.speak("Nor this.", { endpoint: "http://127.0.0.1:9/speak" });
+    dixie.configure({ fallback: true });
+    const c = await dixie.speak("This one yes.", { endpoint: "/speak-down" });
+    return { a, b, c, said: window.__speech.said.map((s) => s.text), voice: dixie.lastVoice() };
+  });
+  assert.deepEqual(r, { a: "failed", b: "failed", c: "done", said: ["This one yes."], voice: "phone" });
+});
+
+test("lastVoice() says which voice spoke", { timeout: 30_000 }, async () => {
+  const p = await voicePage();
+  const r = await p.evaluate(async () => {
+    const { dixie } = await import("/dist/browser/index.js");
+    await dixie.speak("Server.", { endpoint: "/speak" });
+    const a = dixie.lastVoice();
+    await dixie.speak("Phone.", { endpoint: null });
+    return [a, dixie.lastVoice()];
+  });
+  assert.deepEqual(r, ["server", "phone"]);
+});

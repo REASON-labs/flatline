@@ -6,7 +6,8 @@
 // phones), and sound must start from a tap: on iPhone the audio player is unlocked inside the
 // tap, before the server's audio arrives.
 
-export type SpeakResult = "done" | "cancelled" | "unavailable" | "failed";
+/** "blocked": the browser refused to play the server's voice (no tap yet): call unlock() from a tap. */
+export type SpeakResult = "done" | "cancelled" | "unavailable" | "failed" | "blocked";
 
 export interface SpeakOptions {
   /** A language tag; picks the best voice for it. Default: the page's language, else "en". */
@@ -26,10 +27,13 @@ export interface SpeakOptions {
   headers?: Record<string, string>;
   /** Give up on the server and use the phone's voice after this long. Default 15 s. */
   timeoutMs?: number;
+  /** When the server can't speak (down, too slow, an error), use the phone's voice. Default true;
+   *  false resolves "failed" instead, for an app that would rather say nothing than switch voice. */
+  fallback?: boolean;
 }
 
 /** Defaults for every speak(): set the endpoint once, e.g. configure({ endpoint: "/api/voice/speak" }). */
-export interface DixieConfig { endpoint?: string | null; preset?: string; headers?: Record<string, string>; format?: "mp3" | "m4a" | "ogg" | "wav"; timeoutMs?: number }
+export interface DixieConfig { endpoint?: string | null; preset?: string; headers?: Record<string, string>; format?: "mp3" | "m4a" | "ogg" | "wav"; timeoutMs?: number; fallback?: boolean }
 let config: DixieConfig = {};
 export function configure(c: DixieConfig): void { config = { ...config, ...c }; }
 
@@ -108,6 +112,19 @@ function unlockedPlayer(): HTMLAudioElement | null {
 }
 
 /**
+ * Let the server's voice play later. Browsers (iPhone above all) only start sound that a tap
+ * began, so a voice that arrives after a wait, such as a question read aloud when the answer
+ * to the last one comes back, is refused unless the player was unlocked by a tap before.
+ * Call it from the tap that turns reading aloud on (or the first tap in the page). Safe to
+ * repeat; false when this browser has no audio player.
+ */
+export function unlock(): boolean { return unlockedPlayer() !== null; }
+
+/** Which voice said the last thing: the server's, or the phone's (null: nothing yet). */
+let voiceUsed: "server" | "phone" | null = null;
+export const lastVoice = (): "server" | "phone" | null => voiceUsed;
+
+/**
  * Say something. Resolves when it has been said ("done"), or when it was stopped by hush(), a
  * newer speak() or record() ("cancelled"). One at a time. With an endpoint, the server's voice;
  * if the server can't speak (down, too slow, an error), the phone's voice instead. Call it from
@@ -138,7 +155,9 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<SpeakResul
     const phone = () => {
       if (settled) return;
       for (const c of cleanups.splice(0)) { try { c(); } catch { /* best effort */ } }
+      if (useServer && (opts.fallback ?? config.fallback) === false) { settle("failed"); return; }
       if (!canSpeak()) { settle("unavailable"); return; }
+      voiceUsed = "phone";
       sayOnPhone(words, opts, settle, cleanups);
     };
     if (!useServer || !el || !endpoint) { phone(); return; }
@@ -172,8 +191,20 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<SpeakResul
         cleanups.push(() => clearTimeout(g));
       };
       el.src = url;
+      voiceUsed = "server";
       await el.play();
-    }).catch(() => { phone(); });
+    }).catch((e) => {
+      // The browser said no to sound nobody tapped for. The phone's own voice would be refused
+      // too (or be the wrong voice), so say so rather than switching: the app can unlock() on
+      // its next tap and ask again.
+      if ((e as { name?: string })?.name === "NotAllowedError" && !settled) {
+        for (const c of cleanups.splice(0)) { try { c(); } catch { /* best effort */ } }
+        voiceUsed = null;
+        settle("blocked");
+        return;
+      }
+      phone();
+    });
   });
 }
 
@@ -211,4 +242,4 @@ export function hush(): void {
 export const speaking = (): boolean => current !== null;
 
 /** Dixie, as one object: `dixie.speak("Hi")`, `dixie.hush()`. */
-export const dixie = { speak, hush, speaking, configure, primeVoices, canSpeak, loadVoices, chooseVoice };
+export const dixie = { speak, hush, speaking, configure, primeVoices, canSpeak, loadVoices, chooseVoice, unlock, lastVoice };

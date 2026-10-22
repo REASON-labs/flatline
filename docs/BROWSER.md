@@ -88,7 +88,22 @@ better-sounding ones (Apple's "Enhanced"/"Premium", Google's and Microsoft's "Na
 on-device before network voices, and never the novelty voices some systems ship.
 
 `speak` resolves to `"done"`, `"cancelled"` (something else was said, or `hush()`),
-`"unavailable"` (no speech in this browser) or `"failed"`.
+`"unavailable"` (no speech in this browser), `"failed"`, or `"blocked"` (see below).
+
+### When the server's voice is refused
+
+Browsers only start sound that a tap began. A server voice that arrives after a wait, such as the
+next question read aloud once the last answer has been sent, is refused unless the player was
+unlocked by a tap earlier. Since 0.3.3:
+
+- Call `dixie.unlock()` from the tap that turns reading aloud on (or the first tap on the page).
+  It is safe to call again.
+- If the browser refuses anyway, `speak()` resolves `"blocked"` instead of switching to the
+  phone's own voice (which would be refused too, or be the wrong voice). Show a "tap to hear"
+  and call `speak()` again from that tap.
+- `dixie.lastVoice()` says which voice spoke last, `"server"` or `"phone"`, so an app can notice a
+  fallback. To turn the fallback off, `fallback: false` (in `configure()` or a call): when the
+  server can't speak, `speak()` resolves `"failed"` rather than using the phone's voice.
 
 ## iPhone notes
 

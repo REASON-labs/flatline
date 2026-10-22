@@ -78,3 +78,27 @@ test("its refusals", { skip }, async () => {
   assert.equal((await speaker.speak("hi", { preset: "nope" })).code, "unknown_preset");
   assert.equal((await speaker.speak("   ")).code, "empty");
 });
+
+// A phone's speaker wakes up late and a player can cut the end: the audio has silence in front
+// and behind, and a multi-sentence line (spoken a piece at a time) joins into one clip.
+function wavSamples(bytes) {
+  const b = Buffer.from(bytes);
+  const at = b.indexOf("data") + 8;
+  const rate = b.readUInt32LE(24);
+  return { rate, s: new Int16Array(b.buffer.slice(b.byteOffset + at, b.byteOffset + b.length - ((b.length - at) % 2))) };
+}
+const peak = (s, from, to) => s.slice(from, to).reduce((m, x) => Math.max(m, Math.abs(x)), 0);
+
+test("the clip has silence in front and behind, and a few sentences make one clip", { skip, timeout: 120_000 }, async () => {
+  const one = await speaker.speak("Check in before noon.", { format: "wav", preset: "plain" });
+  const many = await speaker.speak("Check in before noon. Is that clear? Good, drink some water.", { format: "wav", preset: "plain" });
+  assert.equal(one.ok && many.ok, true);
+  for (const r of [one, many]) {
+    const { rate, s } = wavSamples(r.audio);
+    assert.equal(rate, 44100);
+    assert.ok(peak(s, 0, Math.round(rate * 0.2)) < 300, "silence for the first 200 ms");
+    assert.ok(peak(s, s.length - Math.round(rate * 0.1), s.length) < 300, "silence for the last 100 ms");
+    assert.ok(peak(s, 0, s.length) > 3000, "and a voice in between");
+  }
+  assert.ok(wavSamples(many.audio).s.length > wavSamples(one.audio).s.length * 2, "the longer line is a longer clip");
+});

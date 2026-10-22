@@ -113,6 +113,17 @@ function unlockedPlayer() {
     return player;
 }
 /**
+ * Let the server's voice play later. Browsers (iPhone above all) only start sound that a tap
+ * began, so a voice that arrives after a wait, such as a question read aloud when the answer
+ * to the last one comes back, is refused unless the player was unlocked by a tap before.
+ * Call it from the tap that turns reading aloud on (or the first tap in the page). Safe to
+ * repeat; false when this browser has no audio player.
+ */
+export function unlock() { return unlockedPlayer() !== null; }
+/** Which voice said the last thing: the server's, or the phone's (null: nothing yet). */
+let voiceUsed = null;
+export const lastVoice = () => voiceUsed;
+/**
  * Say something. Resolves when it has been said ("done"), or when it was stopped by hush(), a
  * newer speak() or record() ("cancelled"). One at a time. With an endpoint, the server's voice;
  * if the server can't speak (down, too slow, an error), the phone's voice instead. Call it from
@@ -156,10 +167,15 @@ export function speak(text, opts = {}) {
                 }
                 catch { /* best effort */ }
             }
+            if (useServer && (opts.fallback ?? config.fallback) === false) {
+                settle("failed");
+                return;
+            }
             if (!canSpeak()) {
                 settle("unavailable");
                 return;
             }
+            voiceUsed = "phone";
             sayOnPhone(words, opts, settle, cleanups);
         };
         if (!useServer || !el || !endpoint) {
@@ -200,8 +216,25 @@ export function speak(text, opts = {}) {
                 cleanups.push(() => clearTimeout(g));
             };
             el.src = url;
+            voiceUsed = "server";
             await el.play();
-        }).catch(() => { phone(); });
+        }).catch((e) => {
+            // The browser said no to sound nobody tapped for. The phone's own voice would be refused
+            // too (or be the wrong voice), so say so rather than switching: the app can unlock() on
+            // its next tap and ask again.
+            if (e?.name === "NotAllowedError" && !settled) {
+                for (const c of cleanups.splice(0)) {
+                    try {
+                        c();
+                    }
+                    catch { /* best effort */ }
+                }
+                voiceUsed = null;
+                settle("blocked");
+                return;
+            }
+            phone();
+        });
     });
 }
 /** The phone's own speech, settling through `settle`. */
@@ -246,5 +279,5 @@ export function hush() {
 /** Is she talking (or about to, the server's audio on its way)? */
 export const speaking = () => current !== null;
 /** Dixie, as one object: `dixie.speak("Hi")`, `dixie.hush()`. */
-export const dixie = { speak, hush, speaking, configure, primeVoices, canSpeak, loadVoices, chooseVoice };
+export const dixie = { speak, hush, speaking, configure, primeVoices, canSpeak, loadVoices, chooseVoice, unlock, lastVoice };
 //# sourceMappingURL=dixie.js.map

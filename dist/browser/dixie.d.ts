@@ -1,4 +1,5 @@
-export type SpeakResult = "done" | "cancelled" | "unavailable" | "failed";
+/** "blocked": the browser refused to play the server's voice (no tap yet): call unlock() from a tap. */
+export type SpeakResult = "done" | "cancelled" | "unavailable" | "failed" | "blocked";
 export interface SpeakOptions {
     /** A language tag; picks the best voice for it. Default: the page's language, else "en". */
     lang?: string;
@@ -17,6 +18,9 @@ export interface SpeakOptions {
     headers?: Record<string, string>;
     /** Give up on the server and use the phone's voice after this long. Default 15 s. */
     timeoutMs?: number;
+    /** When the server can't speak (down, too slow, an error), use the phone's voice. Default true;
+     *  false resolves "failed" instead, for an app that would rather say nothing than switch voice. */
+    fallback?: boolean;
 }
 /** Defaults for every speak(): set the endpoint once, e.g. configure({ endpoint: "/api/voice/speak" }). */
 export interface DixieConfig {
@@ -25,6 +29,7 @@ export interface DixieConfig {
     headers?: Record<string, string>;
     format?: "mp3" | "m4a" | "ogg" | "wav";
     timeoutMs?: number;
+    fallback?: boolean;
 }
 export declare function configure(c: DixieConfig): void;
 /** The parts of a voice that matter for choosing one (SpeechSynthesisVoice, or a test double). */
@@ -48,6 +53,15 @@ export declare function loadVoices(timeoutMs?: number): Promise<SpeechSynthesisV
  */
 export declare function primeVoices(): void;
 /**
+ * Let the server's voice play later. Browsers (iPhone above all) only start sound that a tap
+ * began, so a voice that arrives after a wait, such as a question read aloud when the answer
+ * to the last one comes back, is refused unless the player was unlocked by a tap before.
+ * Call it from the tap that turns reading aloud on (or the first tap in the page). Safe to
+ * repeat; false when this browser has no audio player.
+ */
+export declare function unlock(): boolean;
+export declare const lastVoice: () => "server" | "phone" | null;
+/**
  * Say something. Resolves when it has been said ("done"), or when it was stopped by hush(), a
  * newer speak() or record() ("cancelled"). One at a time. With an endpoint, the server's voice;
  * if the server can't speak (down, too slow, an error), the phone's voice instead. Call it from
@@ -68,4 +82,6 @@ export declare const dixie: {
     canSpeak: typeof canSpeak;
     loadVoices: typeof loadVoices;
     chooseVoice: typeof chooseVoice;
+    unlock: typeof unlock;
+    lastVoice: typeof lastVoice;
 };

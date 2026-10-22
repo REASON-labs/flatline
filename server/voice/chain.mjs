@@ -19,8 +19,17 @@ const r = (n, d = 3) => Number(n.toFixed(d));
  *   drive     0..24 dB   push into a soft clipper: grit
  *   echo      { delay 0..200 ms, decay 0..0.9 }    a short slap: "in the machine"
  *   loudness  -30..-8 LUFS  the final level (phones: about -16)
+ *   leadIn    0..1000 ms  silence before the first word: a phone's speaker (or a Bluetooth
+ *                         headset) wakes up late and would otherwise eat the first syllable
+ *   fade      0..200 ms   a short fade at the end of the last word, so it doesn't stop on a click
+ *   tail      0..1000 ms  silence after the last word, so the player doesn't cut the end off
+ * The service applies PADDING when a preset sets none of the three; buildFilter itself adds
+ * nothing you haven't asked for. Any of them set to 0 switches that one off.
  */
-export const EFFECT_KEYS = ["pitch", "highpass", "lowpass", "presence", "compress", "drive", "echo", "loudness"];
+export const EFFECT_KEYS = ["pitch", "highpass", "lowpass", "presence", "compress", "drive", "echo", "loudness", "leadIn", "fade", "tail"];
+export const PADDING = { leadIn: 250, fade: 40, tail: 150 };
+/** The sample rate every voice is delivered at (loudnorm works at 192 kHz; this brings it back). */
+export const OUT_RATE = 44100;
 
 /** Merge a "tune" (from a request) over a preset's effects: only known keys, only numbers. */
 export function mergeEffects(base = {}, tune = {}) {
@@ -69,6 +78,14 @@ export function buildFilter(effects = {}, rate = 22050) {
   }
   // Always last: a steady level, whatever came before (and headroom so nothing clips).
   f.push(`loudnorm=I=${r(num(effects.loudness, -30, -8, -16), 1)}:TP=-1.5:LRA=7`);
+
+  // Then the edges, which must not change the level: a fade on the last word, silence in front
+  // and behind. (Reversing twice fades the end without needing to know how long it is.)
+  const lead = num(effects.leadIn, 0, 1000, 0), fade = num(effects.fade, 0, 200, 0), tail = num(effects.tail, 0, 1000, 0);
+  if (lead > 0 || fade > 0 || tail > 0) f.push(`aresample=${OUT_RATE}`);
+  if (fade > 0) f.push("areverse", `afade=t=in:d=${r(fade / 1000, 3)}`, "areverse");
+  if (lead > 0) f.push(`adelay=${Math.round(lead)}:all=1`);
+  if (tail > 0) f.push(`apad=pad_dur=${r(tail / 1000, 3)}`);
   return f.join(",");
 }
 

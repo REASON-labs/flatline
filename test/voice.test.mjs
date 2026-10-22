@@ -15,6 +15,7 @@ await writeFile(join(work, "presets.json"), JSON.stringify({
   dixie: { sameAs: "flatline" },
   plain: { voice: "en_US-test-medium", effects: {} },
   flat: { voice: "en_US-test-medium", flatten: true, effects: {} },
+  paced: { voice: "en_US-test-medium", flatten: true, sentenceSilence: 0.4, effects: {} },
   slow: { voice: "en_US-test-medium", speaker: 3, lengthScale: 1.6, effects: {} },
   ghost: { sameAs: "nobody" },
   "bad name!": { voice: "x" },
@@ -25,9 +26,9 @@ Object.assign(process.env, {
   PIPER_BIN: join(HERE, "fixtures/fake-piper.mjs"), FFMPEG_BIN: join(HERE, "fixtures/fake-ffmpeg.mjs"),
   FLATLINE_VOICES_DIR: work, FLATLINE_VOICE_PRESETS: join(work, "presets.json"), FLATLINE_VOICE_MAX_CHARS: "200", FLATLINE_VOICE_MAX_PIPERS: "2",
 });
-const { buildFilter, mergeEffects, FORMATS } = await import("../server/voice/chain.mjs");
-const { flatten } = await import("../server/voice/flatten.mjs");
-const { createVoiceServer, loadPresets, cleanText, stopPipers, defaultPreset, piperKey, runningPipers } = await import("../server/voice/server.mjs");
+const { buildFilter, mergeEffects, FORMATS, PADDING } = await import("../server/voice/chain.mjs");
+const { flatten, segments, MAX_SEGMENTS } = await import("../server/voice/flatten.mjs");
+const { createVoiceServer, loadPresets, cleanText, stopPipers, defaultPreset, piperKey, pausesOf, runningPipers } = await import("../server/voice/server.mjs");
 const { createSpeaker } = await import("../dist/server/index.js");
 
 let server, url;
@@ -77,7 +78,7 @@ test("formats and content types", () => {
 
 test("cleanText and loadPresets: one line of text; bad preset names and voice paths dropped", () => {
   assert.equal(cleanText("  Hello\n\tthere\u0007 you "), "Hello there you");
-  assert.deepEqual(Object.keys(loadPresets()).sort(), ["dixie", "flat", "flatline", "plain", "slow"]);
+  assert.deepEqual(Object.keys(loadPresets()).sort(), ["dixie", "flat", "flatline", "paced", "plain", "slow"]);
 });
 
 // --- the service, with stand-ins ------------------------------------------------------------
@@ -91,10 +92,16 @@ test("speaks: Piper gets the preset's settings and speaker, ffmpeg the chain and
   const piper = log.find((c) => c.piper).piper;
   assert.ok(piper.includes("--json-input") && piper[piper.indexOf("--length_scale") + 1] === "1.2", piper.join(" "));
   assert.ok(piper[piper.indexOf("--model") + 1].endsWith("en_US-test-medium.onnx"));
-  const line = log.find((c) => c.line).line;
-  assert.deepEqual([line.text, line.speaker_id], ["Listen up. Now.", 7]);
+  // One piece at a time, each with the speaker; Piper adds no pause of its own.
+  const lines = log.filter((c) => c.line).map((c) => c.line);
+  assert.deepEqual(lines.slice(0, 2).map((l) => [l.text, l.speaker_id]), [["Listen up.", 7], ["Now.", 7]]);
+  assert.equal(piper[piper.indexOf("--sentence_silence") + 1], "0");
+  // ffmpeg joins them, with the pause after the first, then gives the sound and the edges.
   const ff = log.findLast((c) => c.ffmpeg).ffmpeg;
-  assert.match(ff[ff.indexOf("-af") + 1], /^asetrate=.*loudnorm/);
+  const graph = ff[ff.indexOf("-filter_complex") + 1];
+  assert.match(graph, /^\[0:a\]apad=pad_dur=0\.250\[p0\];\[1:a\]anull\[p1\];\[p0\]\[p1\]concat=n=2:v=0:a=1,asetrate=.*loudnorm=.*adelay=250:all=1,apad=pad_dur=0\.15\[out\]$/);
+  assert.deepEqual(ff.slice(ff.indexOf("-map"), ff.indexOf("-map") + 2), ["-map", "[out]"]);
+  assert.equal(ff.filter((a) => a === "-i").length, 2);
   assert.ok(ff.includes("libopus"));
 });
 
@@ -111,6 +118,22 @@ test("a tune changes the sound for one request", async () => {
   const f = ff[ff.indexOf("-af") + 1];
   assert.match(f, /asetrate=17640/);
   assert.match(f, /volume=2dB/);
+  assert.match(f, /adelay=250:all=1/, "a tune leaves the edges at their defaults");
+});
+
+test("the edges: lead-in, fade and tail by default; a preset or a tune that sets one sets them all", async () => {
+  const ffOf = async (body) => {
+    await fetch(`${url}/speak`, { method: "POST", body: JSON.stringify({ text: "Edges.", format: "wav", ...body }) });
+    const ff = (await calls()).findLast((c) => c.ffmpeg).ffmpeg;
+    return ff[ff.indexOf("-af") + 1];
+  };
+  const dflt = await ffOf({});
+  assert.match(dflt, /loudnorm=I=-16:TP=-1\.5:LRA=7,aresample=44100,areverse,afade=t=in:d=0\.04,areverse,adelay=250:all=1,apad=pad_dur=0\.15$/);
+  const off = await ffOf({ tune: { leadIn: 0, fade: 0, tail: 0 } });
+  assert.doesNotMatch(off, /adelay|areverse|apad|aresample=44100/);
+  const some = await ffOf({ tune: { leadIn: 500 } });
+  assert.match(some, /adelay=500:all=1/);
+  assert.doesNotMatch(some, /apad|areverse/);
 });
 
 test("refusals: empty, too long, unknown preset, unknown format, not JSON, wrong route", async () => {
@@ -126,7 +149,7 @@ test("refusals: empty, too long, unknown preset, unknown format, not JSON, wrong
 
 test("GET / lists presets and formats", async () => {
   const b = await (await fetch(`${url}/`)).json();
-  assert.deepEqual([b.ok, b.presets.sort(), b.formats], [true, ["dixie", "flat", "flatline", "plain", "slow"], ["m4a", "mp3", "ogg", "wav"]]);
+  assert.deepEqual([b.ok, b.presets.sort(), b.formats], [true, ["dixie", "flat", "flatline", "paced", "plain", "slow"], ["m4a", "mp3", "ogg", "wav"]]);
 });
 
 test("one at a time, with a short queue: past it, \"busy\"", async () => {
@@ -153,7 +176,7 @@ test("createSpeaker: audio back, with its type", async () => {
   assert.equal(r.ok, true);
   assert.equal(r.contentType, "audio/mpeg");
   assert.ok(r.audio.byteLength > 44 && r.ms >= 0);
-  assert.deepEqual((await s.presets()).sort(), ["dixie", "flat", "flatline", "plain", "slow"]);
+  assert.deepEqual((await s.presets()).sort(), ["dixie", "flat", "flatline", "paced", "plain", "slow"]);
   assert.equal(await s.health(), true);
 });
 
@@ -207,7 +230,13 @@ for (const [said, shaped, why] of [
 }
 
 test("a preset with flatten shapes the text before Piper; a request can turn it on or off", async () => {
-  const lastLine = async () => (await calls()).findLast((c) => c.line).line.text;
+  // The pieces Piper was given for the last request: the lines after the one before's ffmpeg.
+  const lastLine = async () => {
+    const all = await calls();
+    const end = all.findLastIndex((c) => c.ffmpeg);
+    const start = all.slice(0, end).findLastIndex((c) => c.ffmpeg);
+    return all.slice(start + 1, end).filter((c) => c.line).map((c) => c.line.text).join(" ");
+  };
   await fetch(`${url}/speak`, { method: "POST", body: JSON.stringify({ text: "Listen up, you have work!", preset: "flat", format: "wav" }) });
   assert.equal(await lastLine(), "Listen up. You have work.");
   await fetch(`${url}/speak`, { method: "POST", body: JSON.stringify({ text: "Listen up, you have work!", preset: "flat", format: "wav", flatten: false }) });
@@ -258,4 +287,60 @@ test("at most FLATLINE_VOICE_MAX_PIPERS run: the least recently used one stops f
   await say("flatline");                      // stopped earlier: starts again
   assert.equal(await starts(), n + 1);
   assert.equal(runningPipers(), 2);
+});
+
+// --- the edges and the pauses -----------------------------------------------------------------
+
+test("the chain: lead-in, fade and tail come after the level, and only as asked", () => {
+  assert.equal(buildFilter({ leadIn: 250 }), "loudnorm=I=-16:TP=-1.5:LRA=7,aresample=44100,adelay=250:all=1");
+  assert.equal(buildFilter({ fade: 40 }), "loudnorm=I=-16:TP=-1.5:LRA=7,aresample=44100,areverse,afade=t=in:d=0.04,areverse");
+  assert.equal(buildFilter({ tail: 100 }), "loudnorm=I=-16:TP=-1.5:LRA=7,aresample=44100,apad=pad_dur=0.1");
+  assert.equal(buildFilter({ ...PADDING }).split(",").slice(-5).join(","), "areverse,afade=t=in:d=0.04,areverse,adelay=250:all=1,apad=pad_dur=0.15");
+  assert.match(buildFilter({ leadIn: 99999, tail: 99999, fade: 99999 }), /adelay=1000:all=1,apad=pad_dur=1$/);
+  assert.match(buildFilter({ leadIn: 99999, fade: 99999 }), /afade=t=in:d=0\.2,/);
+  assert.doesNotMatch(buildFilter({ leadIn: "250;rm", fade: "x", tail: null }), /adelay|afade|apad|aresample/);
+  assert.deepEqual(mergeEffects({}, { leadIn: 100, tail: 50, fade: 10 }), { leadIn: 100, tail: 50, fade: 10 });
+});
+
+for (const [said, flat, expected, why] of [
+  ["Listen up. You have three things. Call the dentist.", false, [["Listen up.", "stop"], ["You have three things.", "stop"], ["Call the dentist.", "stop"]], "sentences, a statement pause after each"],
+  ["Is it done? Then go.", false, [["Is it done?", "question"], ["Then go.", "stop"]], "a question pause after a question"],
+  ["Listen up, you have three things.", true, [["Listen up.", "clause"], ["You have three things.", "stop"]], "a comma flatten turned into a stop is a clause, a shorter pause"],
+  ["Good, that's one done, now get some sleep.", true, [["Good.", "clause"], ["That's one done.", "clause"], ["Now get some sleep.", "stop"]], "several clauses"],
+  ["Great! Do it now! Is that clear?", true, [["Great.", "stop"], ["Do it now.", "stop"], ["Is that clear?", "question"]], "\"!\" ends a sentence, a real stop"],
+  ["Listen up, you have three things.", false, [["Listen up, you have three things.", "stop"]], "without flatten the comma stays inside the piece"],
+  ["Ask Dr. Smith at 3.30 pm. Then call, e.g. Mr. Jones.", false, [["Ask Dr. Smith at 3.30 pm.", "stop"], ["Then call, e.g. Mr. Jones.", "stop"]], "abbreviations and decimals don't split"],
+  ["Pick up milk, eggs and bread. Then rest.", true, [["Pick up milk, eggs and bread.", "stop"], ["Then rest.", "stop"]], "a list keeps its commas"],
+  ["No full stop at the end", false, [["No full stop at the end", "stop"]], "no ending mark"],
+  ["   ", true, [], "nothing is nothing"],
+]) {
+  test(`segments: ${why}`, () => assert.deepEqual(segments(said, flat).map((s) => [s.text, s.pause]), expected));
+}
+
+test("segments: flatten() and the joined segments say the same words", () => {
+  const t = "Listen up, you have three things! Good, that's one done. Is it? Then go, now.";
+  assert.equal(segments(t, true).map((s) => s.text).join(" "), flatten(t));
+});
+
+test("segments: no more than MAX_SEGMENTS, the rest kept in the last", () => {
+  const t = Array.from({ length: 40 }, (_, i) => `Sentence ${i}.`).join(" ");
+  const s = segments(t);
+  assert.equal(s.length, MAX_SEGMENTS);
+  assert.match(s.at(-1).text, /Sentence 23\. Sentence 24\..*Sentence 39\.$/);
+});
+
+test("pausesOf: from sentenceSilence, or set by the preset; clause is shorter than a statement", () => {
+  assert.deepEqual(pausesOf({ sentenceSilence: 0.4 }), { stop: 0.4, clause: 0.2, question: 0.46 });
+  assert.deepEqual(pausesOf({}), { stop: 0.25, clause: 0.125, question: 0.288 });
+  assert.deepEqual(pausesOf({ sentenceSilence: 0.5, pauses: { clause: 0.1, question: 0.9 } }), { stop: 0.5, clause: 0.1, question: 0.9 });
+  assert.deepEqual(pausesOf({ pauses: { stop: 99, clause: "x" } }), { stop: 2, clause: 1, question: 2 });
+});
+
+test("the pauses reach ffmpeg: a clause is shorter than a statement, a question longer", async () => {
+  await fetch(`${url}/speak`, { method: "POST", body: JSON.stringify({ text: "Listen up, you have work. Is it clear? Go.", preset: "paced", format: "wav" }) });
+  const ff = (await calls()).findLast((c) => c.ffmpeg).ffmpeg;
+  const graph = ff[ff.indexOf("-filter_complex") + 1];
+  assert.match(graph, /\[0:a\]apad=pad_dur=0\.200\[p0\];\[1:a\]apad=pad_dur=0\.400\[p1\];\[2:a\]apad=pad_dur=0\.460\[p2\];\[3:a\]anull\[p3\]/);
+  const said = (await calls()).filter((c) => c.line).map((c) => c.line.text).slice(-4);
+  assert.deepEqual(said, ["Listen up.", "You have work.", "Is it clear?", "Go."]);
 });

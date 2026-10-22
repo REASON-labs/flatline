@@ -9,7 +9,8 @@
 // same voice and pace share one. At most FLATLINE_VOICE_MAX_PIPERS run at a time (the least
 // recently used one stops first), and one that sits idle stops after FLATLINE_VOICE_IDLE_MS, so
 // a cast of characters fits in the memory cap. One sentence is made at a time (it is CPU-bound),
-// with a short queue. Settings come from the environment (see server/install-voice.sh); presets
+// with a short queue. A request is spoken a sentence at a time, with the pause after each set
+// by what ended it (a clause, a statement, a question: see pausesOf), then joined. Settings come from the environment (see server/install-voice.sh); presets
 // from FLATLINE_VOICE_PRESETS, re-read on restart. A preset can be another's other name:
 // { "sameAs": "flatline" }.
 import { createServer } from "node:http";
@@ -20,8 +21,8 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline";
-import { buildFilter, mergeEffects, FORMATS } from "./chain.mjs";
-import { flatten } from "./flatten.mjs";
+import { buildFilter, mergeEffects, FORMATS, PADDING } from "./chain.mjs";
+import { segments } from "./flatten.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const env = process.env;
@@ -74,7 +75,22 @@ const pipers = new Map();
 
 /** Presets with the same voice and the same pace share a Piper (the speaker is chosen per line). */
 export function piperKey(p) {
-  return [p.voice, clamp(p.lengthScale, 0.5, 2, 1), clamp(p.noiseScale, 0, 1.5, 0.667), clamp(p.noiseW, 0, 1.5, 0.8), clamp(p.sentenceSilence, 0, 2, 0.2)].join("|");
+  return [p.voice, clamp(p.lengthScale, 0.5, 2, 1), clamp(p.noiseScale, 0, 1.5, 0.667), clamp(p.noiseW, 0, 1.5, 0.8)].join("|");
+}
+
+/**
+ * The pauses (seconds) after a clause, a statement and a question. A preset can set any of them
+ * in "pauses"; what it leaves out comes from "sentenceSilence" (the pause after a statement):
+ * a clause gets half of it, a question a little more.
+ */
+export function pausesOf(p) {
+  const stop = clamp(p.pauses?.stop ?? p.sentenceSilence, 0, 2, 0.25);
+  const ms = (n) => Math.round(n * 1000) / 1000;
+  return {
+    stop: ms(stop),
+    clause: ms(clamp(p.pauses?.clause, 0, 2, stop * 0.5)),
+    question: ms(clamp(p.pauses?.question, 0, 2, stop * 1.15)),
+  };
 }
 
 /** How many Piper processes are running (for tests). */
@@ -107,7 +123,7 @@ function piperFor(name, p) {
     "--length_scale", String(clamp(p.lengthScale, 0.5, 2, 1)),
     "--noise_scale", String(clamp(p.noiseScale, 0, 1.5, 0.667)),
     "--noise_w", String(clamp(p.noiseW, 0, 1.5, 0.8)),
-    "--sentence_silence", String(clamp(p.sentenceSilence, 0, 2, 0.2))];
+    "--sentence_silence", "0"];   // the pauses are put in between the pieces, by pausesOf
   const child = spawn(PIPER, args, { stdio: ["pipe", "pipe", "pipe"], env: { ...env, LD_LIBRARY_PATH: dirname(PIPER) } });
   const proc = { child, dead: false, waiting: [] };
   createInterface({ input: child.stdout }).on("line", (line) => {
@@ -171,16 +187,37 @@ export async function render(presets, { text, preset = defaultPreset(presets), f
   const p = presets[preset];
   if (!p) throw Object.assign(new Error(`No preset "${preset}".`), { code: "unknown_preset", status: 404 });
   // A preset's "flatten" (or a request's, true or false, to compare) shapes the text first.
-  if (typeof flat === "boolean" ? flat : p.flatten === true) text = flatten(text);
+  const pieces = segments(text, typeof flat === "boolean" ? flat : p.flatten === true);
+  if (!pieces.length) throw Object.assign(new Error("There's nothing to say."), { code: "empty", status: 400 });
   const fmt = FORMATS[format];
   if (!fmt) throw Object.assign(new Error(`No format "${format}".`), { code: "bad_format", status: 400 });
   const dir = await mkdtemp(join(env.FLATLINE_VOICE_TMP ?? tmpdir(), "voice-"));
   try {
-    const wav = join(dir, "raw.wav");
     const out = join(dir, `out.${fmt.ext}`);
-    await synthesize(preset, p, text, wav);
-    const filter = buildFilter(mergeEffects(p.effects ?? {}, tune ?? {}), sampleRate(p.voice));
-    await run(FFMPEG, ["-hide_banner", "-loglevel", "error", "-y", "-i", wav, "-af", filter, "-ac", "1", ...fmt.args, out]);
+    const wavs = [];
+    for (const [i, piece] of pieces.entries()) {
+      const wav = join(dir, `raw${i}.wav`);
+      await synthesize(preset, p, piece.text, wav);
+      wavs.push(wav);
+    }
+    // Edges (lead-in, fade, tail) are the service's own unless the preset (or a tune) sets them.
+    const effects = mergeEffects(p.effects ?? {}, tune ?? {});
+    const edges = ["leadIn", "fade", "tail"].some((k) => k in effects) ? {} : PADDING;
+    const filter = buildFilter({ ...edges, ...effects }, sampleRate(p.voice));
+    const inputs = wavs.flatMap((w) => ["-i", w]);
+    const encode = ["-ac", "1", ...fmt.args, out];
+    if (wavs.length === 1) {
+      await run(FFMPEG, ["-hide_banner", "-loglevel", "error", "-y", ...inputs, "-af", filter, ...encode]);
+    } else {
+      // Each piece gets the silence its ending calls for, then they are joined and given the sound.
+      const pauses = pausesOf(p);
+      const pad = pieces.map((piece, i) => i === pieces.length - 1 ? "anull" : `apad=pad_dur=${pauses[piece.pause].toFixed(3)}`);
+      const graph = [
+        ...pad.map((f, i) => `[${i}:a]${f}[p${i}]`),
+        `${pad.map((_, i) => `[p${i}]`).join("")}concat=n=${pad.length}:v=0:a=1,${filter}[out]`,
+      ].join(";");
+      await run(FFMPEG, ["-hide_banner", "-loglevel", "error", "-y", ...inputs, "-filter_complex", graph, "-map", "[out]", ...encode]);
+    }
     return { audio: await readFile(out), type: fmt.type };
   } finally {
     await rm(dir, { recursive: true, force: true });

@@ -99,7 +99,7 @@ Presets live in `/etc/flatline/voice-presets.json` (the shipped ones are in
   "lengthScale": 1.3,                  // > 1 is slower, more deliberate
   "noiseScale": 0.35,                  // lower is flatter, less sing-song intonation (below ~0.25 turns robotic)
   "noiseW": 0.5,                       // lower is steadier, more even timing
-  "sentenceSilence": 0.55,             // seconds of pause between sentences
+  "sentenceSilence": 0.55,             // seconds of pause after a statement (a clause: half; a question: a bit more)
   "effects": {
     "pitch": 0.9,                          // 0.7..1.3: lower is deeper (the pace is kept)
     "highpass": 110, "lowpass": 5200,      // Hz: a narrower band sounds more like a line or radio
