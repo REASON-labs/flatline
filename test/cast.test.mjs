@@ -11,7 +11,7 @@ const INSTALLER = readFileSync(new URL("../server/install-voice.sh", import.meta
 const DOCS = readFileSync(new URL("../docs/VOICE.md", import.meta.url), "utf8");
 const PLACEHOLDERS = new Set(["name", "n", "time", "title", "who", "changes", "them", "error", "memo"]);
 /** Lines a lock screen may show: never {title}. */
-const TEXT_KEYS = new Set(["briefing.text", "briefing.textEmpty", "event.text", "tomorrow.text", "tomorrow.textClear", "wake.text", "wake.textLate"]);
+const TEXT_KEYS = new Set(["briefing.text", "briefing.textEmpty", "event.text", "tomorrow.text", "tomorrow.textClear", "wake.text", "wake.textLate", "wake.riseText", "wake.riseTextLate", "wake.snoozed"]);
 const isText = (k) => TEXT_KEYS.has(k) || k.startsWith("inbox.") || k === "wake.partner";
 /** Catchphrases and names that would make a character an imitation. */
 const BANNED = [/make it so/i, /\bengage\b/i, /captain's log/i, /\bdave\b/i, /i'm afraid/i, /pod bay/i, /satisfied with your care/i,
@@ -39,9 +39,12 @@ test("dixie is Flatline's old name; anything else unknown", () => {
 });
 
 for (const [id, lines] of all) {
-  test(`${id}: every line is there, eight wake-up steps`, () => {
+  test(`${id}: every line is there, eight wake-up steps, three rise-and-shine nudges`, () => {
     assert.deepEqual(entries(lines).map(([k]) => k), KEYS);
     assert.equal(lines.wake.steps.length, 8);
+    assert.equal(lines.wake.rise.length, 3);
+    assert.match(lines.wake.rise[0], /\{time\}/, "the first nudge says the time");
+    for (const t of lines.wake.rise) assert.doesNotMatch(t, /important|critical|essential|matter/i, "the ordinary morning never says it was important");
   });
   test(`${id}: short sentences ending in full stops; no commas, "!", "?" or emoji`, () => {
     for (const [k, t] of entries(lines)) {

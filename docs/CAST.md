@@ -60,7 +60,8 @@ await speaker.speak(spoken, { preset: c?.preset ?? "plain" });
 Placeholders: `{name}` (the app), `{n}` (a number, as it should be said), `{time}`, `{title}`
 (spoken lines only), `{who}` (the partner note), `{changes}` and `{them}` (`changesVars(n)`),
 `{error}` and `{memo}` (the inbox's "failed"). `fill()` drops a placeholder with no value.
-The wake-up has eight steps: at the time, then 5, 10, 20, 30, 40, 50 and 60 minutes past.
+The wake-up has eight steps: at the time, then 5, 10, 20, 30, 40, 50 and 60 minutes past (`wake.steps`, for a morning marked important).
+An ordinary morning is `wake.rise`: three nudges, at the time, 5 and 15 minutes past, then quiet; `wake.snoozed` answers "10 more minutes" (0.5.0).
 
 `c.sample` is one line in character, for a "hear a sample" button. `COMPARE_LINES` are the same
 few lines for every character, for comparing them by ear: `tools/cast-samples.mjs` makes an MP3

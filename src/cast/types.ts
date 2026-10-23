@@ -76,6 +76,14 @@ export interface LineSet {
     call: string;
     /** After they press 1. */
     awake: string;
+    /** Rise and shine, the ordinary morning (not marked important): spoken, one per nudge: at the time, 5 and 15 minutes past. {time}, {n}. */
+    rise: readonly string[];
+    /** Text, the ordinary morning, at the time. {time}. */
+    riseText: string;
+    /** Text, the ordinary morning, later nudges. {n} minutes past {time}. */
+    riseTextLate: string;
+    /** After "10 more minutes": {n} minutes, then it comes back. */
+    snoozed: string;
     /** To their partner, after an hour, only if they allowed it. {who}, {time}. Plain, kind, and no more. */
     partner: string;
   };

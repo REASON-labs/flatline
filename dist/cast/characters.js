@@ -51,6 +51,15 @@ export const flatline = {
             textLate: "Wake up. {n} minutes past {time}. Open the app.",
             call: "Flatline. It's {n} minutes past {time}. You said this one mattered. Get up. Press one when you're up.",
             awake: "Good. You're up. Now go.",
+            // Rise and shine, the ordinary morning: three nudges (at the time, 5 and 15 past), then quiet.
+            rise: [
+                "Flatline. It's {time}. Up.",
+                "Five past. You're still in bed. Up.",
+                "Quarter past. Last nudge from me. Get up.",
+            ],
+            riseText: "Rise and shine. It's {time}.",
+            riseTextLate: "Up. {n} minutes past {time}.",
+            snoozed: "{n} minutes. Then I'm back.",
             partner: PARTNER,
         },
         inbox: {
@@ -128,6 +137,15 @@ export const kestrel = {
             textLate: "Wake-up. {n} minutes past {time}. Check in.",
             call: "Kestrel. It's {n} minutes past {time}. You're needed upright. Press one when you're up.",
             awake: "Contact confirmed. Move out.",
+            // Rise and shine, the ordinary morning: three nudges (at the time, 5 and 15 past), then quiet.
+            rise: [
+                "Kestrel. It's {time}. Rise and shine.",
+                "Five past. Up and at it.",
+                "Quarter past. Last nudge from me. Up.",
+            ],
+            riseText: "Rise and shine. It's {time}.",
+            riseTextLate: "Rise and shine. {n} minutes past {time}.",
+            snoozed: "{n} minutes. Then I'm back on the line.",
             partner: PARTNER,
         },
         inbox: {
@@ -205,6 +223,15 @@ export const iris = {
             textLate: "Wake-up. {n} minutes past {time}. Please open the app.",
             call: "This is Iris. It's {n} minutes past {time}. I'd like you to get up now. Press one when you are.",
             awake: "There you are. Thank you.",
+            // Rise and shine, the ordinary morning: three nudges (at the time, 5 and 15 past), then quiet.
+            rise: [
+                "Good morning. It's {time}. Time to get up.",
+                "Five minutes past. Whenever you're ready. Up you get.",
+                "Quarter past. One last nudge from me. Up you get.",
+            ],
+            riseText: "Rise and shine. It's {time}.",
+            riseTextLate: "Rise and shine. {n} minutes past {time}.",
+            snoozed: "{n} more minutes. Then up.",
             partner: PARTNER,
         },
         inbox: {
@@ -282,6 +309,15 @@ export const ashford = {
             textLate: "Wake-up. {n} minutes past {time}. Do open the app.",
             call: "Ashford. It's {n} minutes past {time}. Up you get. Press one when you're up.",
             awake: "Splendid. Carry on.",
+            // Rise and shine, the ordinary morning: three nudges (at the time, 5 and 15 past), then quiet.
+            rise: [
+                "Ashford. It's {time}. Rise and shine.",
+                "Five past. The kettle won't put itself on.",
+                "Quarter past. A last nudge. Up you get.",
+            ],
+            riseText: "Rise and shine. It's {time}.",
+            riseTextLate: "Rise and shine. {n} minutes past {time}.",
+            snoozed: "{n} minutes more. Then up we get.",
             partner: PARTNER,
         },
         inbox: {
@@ -359,6 +395,15 @@ export const hoshi = {
             textLate: "Wake-up. {n} minutes past {time}. Open the app when you're up.",
             call: "Hi. It's Hoshi. It's {n} minutes past {time}. Please get up now. Press one when you're up.",
             awake: "You're up. Have some water.",
+            // Rise and shine, the ordinary morning: three nudges (at the time, 5 and 15 past), then quiet.
+            rise: [
+                "Good morning. It's {time}. Time to get up.",
+                "Five past. Stretch first. Then up.",
+                "Quarter past. One last little nudge. Up you get.",
+            ],
+            riseText: "Rise and shine. It's {time}.",
+            riseTextLate: "Rise and shine. {n} minutes past {time}.",
+            snoozed: "{n} more minutes. Then up. Okay.",
             partner: PARTNER,
         },
         inbox: {
@@ -436,6 +481,15 @@ export const calder = {
             textLate: "Wake-up. {n} minutes past {time}. Report in.",
             call: "This is Captain Calder. It's {n} minutes past {time}. Up and about. Press one when you're up.",
             awake: "Good. The day is yours.",
+            // Rise and shine, the ordinary morning: three nudges (at the time, 5 and 15 past), then quiet.
+            rise: [
+                "Captain Calder. It's {time}. Rise and shine.",
+                "Five past. On your feet.",
+                "Quarter past. Last call from the bridge. Up.",
+            ],
+            riseText: "Rise and shine. It's {time}.",
+            riseTextLate: "Rise and shine. {n} minutes past {time}.",
+            snoozed: "{n} minutes. Then on your feet.",
             partner: PARTNER,
         },
         inbox: {
@@ -513,6 +567,15 @@ export const nettle = {
             textLate: "Wake up. {n} minutes past {time}. Open the app.",
             call: "Nettle. It's {n} minutes past {time}. Get up. Press one when you're up. Then I'll leave you alone.",
             awake: "Finally. You're up. Go.",
+            // Rise and shine, the ordinary morning: three nudges (at the time, 5 and 15 past), then quiet.
+            rise: [
+                "Nettle. It's {time}. Up.",
+                "Five past. I can hear you not getting up.",
+                "Quarter past. Last nudge. Get up already.",
+            ],
+            riseText: "Rise and shine. It's {time}.",
+            riseTextLate: "Up. {n} minutes past {time}.",
+            snoozed: "{n} minutes. Then I'm back. Don't test me.",
             partner: PARTNER,
         },
         inbox: {
@@ -581,6 +644,15 @@ export const plainLines = {
         textLate: "Wake-up. {n} minutes past {time}. Please get up and open the app.",
         call: "This is your wake-up call. It's {n} minutes past {time}. Press one if you're up.",
         awake: "Good. You're up.",
+        // Rise and shine, the ordinary morning: three nudges (at the time, 5 and 15 past), then quiet.
+        rise: [
+            "It's {time}. Time to get up.",
+            "It's five minutes past. Time to get up.",
+            "It's a quarter past. One last nudge. Time to get up.",
+        ],
+        riseText: "Rise and shine. It's {time}.",
+        riseTextLate: "Rise and shine. {n} minutes past {time}. Time to get up.",
+        snoozed: "{n} more minutes. Then time to get up.",
         partner: PARTNER,
     },
     inbox: {
