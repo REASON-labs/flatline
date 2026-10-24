@@ -24,6 +24,20 @@ export interface Tune {
   echo?: { delay?: number; decay?: number };
 }
 
+/** Pauses (seconds) after a statement, a clause and a question, for one request (0..3). */
+export interface Pauses { stop?: number; clause?: number; question?: number }
+
+/** What one request can change: the preset, the format, the sound, the pace and the pauses. */
+export interface SpeakOptions {
+  preset?: string;
+  format?: SpeakFormat;
+  tune?: Tune;
+  /** × the preset's speed: 0.6..1.4 in steps of 0.05; lower is slower (0.75 for slow guidance). */
+  pace?: number;
+  /** Merged over the preset's own pauses. */
+  pauses?: Pauses;
+}
+
 export interface SpeakerOptions {
   /** The voice service, e.g. "http://127.0.0.1:8087". Empty: every call is "unavailable". */
   url: string | undefined;
@@ -37,7 +51,7 @@ export interface SpeakerOptions {
 
 export interface Speaker {
   /** Text in, audio out. Preset: a character's (flatline/cast), unset for the service's default (flatline); format default "m4a" (AAC: Signal, iPhone). */
-  speak(text: string, opts?: { preset?: string; format?: SpeakFormat; tune?: Tune }): Promise<SpeakResult>;
+  speak(text: string, opts?: SpeakOptions): Promise<SpeakResult>;
   /** The service's presets, or null when it can't be reached. */
   presets(): Promise<string[] | null>;
   /** Is the service up? */
@@ -76,7 +90,10 @@ export function createSpeaker(opts: SpeakerOptions): Speaker {
         const res = await doFetch(`${base}/speak`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text: words, ...(o.preset ? { preset: o.preset } : {}), format: o.format ?? "m4a", ...(o.tune ? { tune: o.tune } : {}) }),
+          body: JSON.stringify({
+            text: words, ...(o.preset ? { preset: o.preset } : {}), format: o.format ?? "m4a",
+            ...(o.tune ? { tune: o.tune } : {}), ...(typeof o.pace === "number" ? { pace: o.pace } : {}), ...(o.pauses ? { pauses: o.pauses } : {}),
+          }),
           signal: AbortSignal.timeout(timeoutMs),
         });
         const type = res.headers.get("content-type") ?? "";

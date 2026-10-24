@@ -77,7 +77,7 @@ The service's own API, for curl:
 
 ```bash
 curl -s http://127.0.0.1:8087/                       # { ok, presets, default, formats }
-# POST /speak takes { text, preset?, format?, tune?, flatten? }
+# POST /speak takes { text, preset?, format?, tune?, flatten?, pace?, pauses? }
 curl -s -H 'content-type: application/json' \
   -d '{"text":"Listen up.","preset":"flatline","format":"mp3"}' \
   -o flatline.mp3 http://127.0.0.1:8087/speak
@@ -120,6 +120,24 @@ curl -s -H 'content-type: application/json' \
   -d '{"text":"Listen up.","format":"mp3","tune":{"pitch":0.85,"drive":9,"lowpass":4200}}' \
   -o try.mp3 http://127.0.0.1:8087/speak
 ```
+
+**Pace and pauses, per request (0.6.0).** A character's speed and pauses are its preset's, for
+every app. One request can ask for its own: `pace` is a multiple of the preset's speed (0.6 to
+1.4 in steps of 0.05; lower is slower), and `pauses` sets the silence in seconds after a
+statement, a clause or a question (0 to 3, merged over the preset's own). Slow, spoken guidance
+(meditation, wind-down) suits about `pace: 0.75` with `pauses: { "stop": 1.2 }`; reminders want
+the preset as it is.
+
+```bash
+curl -s -H 'content-type: application/json' \
+  -d '{"text":"Breathe in. Let it go.","preset":"hoshi","format":"mp3","pace":0.75,"pauses":{"stop":1.2}}' \
+  -o slow.mp3 http://127.0.0.1:8087/speak
+```
+
+Each pace runs its own Piper process (the model loads once per voice and pace), so paces are
+rounded to the steps above and still count against `FLATLINE_VOICE_MAX_PIPERS`: an app that
+uses one or two paces costs one or two more processes. From Node: `voice.speak(text, { preset,
+pace: 0.75, pauses: { stop: 1.2 } })`. To compare by ear: `tools/cast-samples.mjs out/ --pace 0.75`.
 
 **`flatten`.** On a preset, it shapes the text before Piper sees it: `!` becomes `.`, a semicolon
 ends a sentence, and a comma that clearly ends a clause (the next word is "you", "that's", "then",

@@ -3,6 +3,7 @@
 // (COMPARE_LINES) and then one line in character, through a real voice service.
 //
 //   FLATLINE_VOICE_URL=http://127.0.0.1:8087 node tools/cast-samples.mjs out/
+//   FLATLINE_VOICE_URL=... node tools/cast-samples.mjs out/ --pace 0.75   # slower, to compare
 //
 // Writes out/<n>-<id>.mp3 (the compare lines, then the character's sample) and
 // out/<n>-<id>-in-character.mp3 (the sample alone).
@@ -11,13 +12,17 @@ import { join } from "node:path";
 import { CAST, COMPARE_LINES } from "../dist/cast/index.js";
 import { createSpeaker } from "../dist/server/index.js";
 
-const OUT = process.argv[2] ?? "cast-samples";
+const args = process.argv.slice(2);
+const at = args.indexOf("--pace");
+const pace = at >= 0 ? Number(args.splice(at, 2)[1]) : undefined;
+if (pace !== undefined && !Number.isFinite(pace)) { console.error("--pace takes a number, e.g. 0.75"); process.exit(2); }
+const OUT = args[0] ?? "cast-samples";
 const speaker = createSpeaker({ url: process.env.FLATLINE_VOICE_URL ?? "http://127.0.0.1:8087", timeoutMs: 120_000 });
 mkdirSync(OUT, { recursive: true });
 let failed = 0;
 for (const [i, c] of CAST.entries()) {
   for (const [file, text] of [[`${i + 1}-${c.id}.mp3`, `${COMPARE_LINES.join(" ")} ${c.sample}`], [`${i + 1}-${c.id}-in-character.mp3`, c.sample]]) {
-    const r = await speaker.speak(text, { preset: c.preset, format: "mp3" });
+    const r = await speaker.speak(text, { preset: c.preset, format: "mp3", ...(pace ? { pace } : {}) });
     if (!r.ok) { failed++; console.error(`${c.id}: ${r.code} ${r.error}`); continue; }
     writeFileSync(join(OUT, file), r.audio);
     console.log(`${file}  ${c.name}  ${r.audio.byteLength} bytes in ${r.ms} ms`);

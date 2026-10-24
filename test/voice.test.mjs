@@ -28,7 +28,7 @@ Object.assign(process.env, {
 });
 const { buildFilter, mergeEffects, FORMATS, PADDING } = await import("../server/voice/chain.mjs");
 const { flatten, segments, MAX_SEGMENTS } = await import("../server/voice/flatten.mjs");
-const { createVoiceServer, loadPresets, cleanText, stopPipers, defaultPreset, piperKey, pausesOf, runningPipers } = await import("../server/voice/server.mjs");
+const { createVoiceServer, loadPresets, cleanText, stopPipers, defaultPreset, piperKey, pausesOf, paceOf, withRequest, runningPipers } = await import("../server/voice/server.mjs");
 const { createSpeaker } = await import("../dist/server/index.js");
 
 let server, url;
@@ -333,7 +333,7 @@ test("pausesOf: from sentenceSilence, or set by the preset; clause is shorter th
   assert.deepEqual(pausesOf({ sentenceSilence: 0.4 }), { stop: 0.4, clause: 0.2, question: 0.46 });
   assert.deepEqual(pausesOf({}), { stop: 0.25, clause: 0.125, question: 0.288 });
   assert.deepEqual(pausesOf({ sentenceSilence: 0.5, pauses: { clause: 0.1, question: 0.9 } }), { stop: 0.5, clause: 0.1, question: 0.9 });
-  assert.deepEqual(pausesOf({ pauses: { stop: 99, clause: "x" } }), { stop: 2, clause: 1, question: 2 });
+  assert.deepEqual(pausesOf({ pauses: { stop: 99, clause: "x" } }), { stop: 3, clause: 1.5, question: 3 }, "at most 3 s (slow guidance can want long pauses)");
 });
 
 test("the pauses reach ffmpeg: a clause is shorter than a statement, a question longer", async () => {
@@ -343,4 +343,56 @@ test("the pauses reach ffmpeg: a clause is shorter than a statement, a question 
   assert.match(graph, /\[0:a\]apad=pad_dur=0\.200\[p0\];\[1:a\]apad=pad_dur=0\.400\[p1\];\[2:a\]apad=pad_dur=0\.460\[p2\];\[3:a\]anull\[p3\]/);
   const said = (await calls()).filter((c) => c.line).map((c) => c.line.text).slice(-4);
   assert.deepEqual(said, ["Listen up.", "You have work.", "Is it clear?", "Go."]);
+});
+
+
+// --- pace and pauses per request ---------------------------------------------------------
+
+test("paceOf: 0.6..1.4 in steps of 0.05; anything that isn't a number is 1", () => {
+  assert.equal(paceOf(0.75), 0.75);
+  assert.equal(paceOf(0.77), 0.75);
+  assert.equal(paceOf(0.2), 0.6);
+  assert.equal(paceOf(9), 1.4);
+  for (const v of [undefined, null, "0.5", NaN, Infinity, {}]) assert.equal(paceOf(v), 1, String(v));
+});
+
+test("withRequest: pace divides the preset's speed; pauses merge over its own; nothing asked is the preset", () => {
+  const p = { voice: "v", lengthScale: 1.2, sentenceSilence: 0.4, effects: { pitch: 0.9 } };
+  assert.equal(withRequest(p), p);
+  assert.equal(withRequest(p, { pace: 1 }), p);
+  const slow = withRequest(p, { pace: 0.75 });
+  assert.equal(slow.lengthScale, 1.6);
+  assert.deepEqual(slow.effects, p.effects);
+  assert.equal(p.lengthScale, 1.2, "the preset itself is never changed");
+  assert.equal(withRequest({ voice: "v" }, { pace: 0.6 }).lengthScale, 1.667, "a preset without a speed is 1");
+  assert.equal(withRequest({ voice: "v", lengthScale: 1.8 }, { pace: 0.6 }).lengthScale, 2, "Piper's limit");
+  const roomy = withRequest(p, { pauses: { stop: 1.2, question: 9 } });
+  assert.deepEqual(pausesOf(roomy), { stop: 1.2, clause: 0.2, question: 3 });
+  assert.deepEqual(pausesOf(withRequest(p, { pauses: { stop: "long" } })), pausesOf(p), "only numbers get in");
+  assert.equal(withRequest(p, { pauses: [1, 2] }), p);
+});
+
+test("a request's pace starts a Piper at that speed; the same pace reuses it", async () => {
+  const before = (await calls()).filter((c) => c.piper).length;
+  for (const pace of [0.75, 0.76]) await fetch(`${url}/speak`, { method: "POST", body: JSON.stringify({ text: "Slowly.", preset: "slow", format: "wav", pace }) });
+  const starts = (await calls()).filter((c) => c.piper).slice(before);
+  assert.equal(starts.length, 1, "0.76 rounds to 0.75: one Piper for both");
+  const piper = starts[0].piper;
+  assert.equal(piper[piper.indexOf("--length_scale") + 1], "2", "1.6 / 0.75, kept to Piper's 2");
+});
+
+test("a request's pauses go between the pieces", async () => {
+  await fetch(`${url}/speak`, { method: "POST", body: JSON.stringify({ text: "Breathe in. Breathe out.", preset: "plain", format: "wav", pauses: { stop: 1.5 } }) });
+  const ff = (await calls()).findLast((c) => c.ffmpeg).ffmpeg;
+  assert.match(ff[ff.indexOf("-filter_complex") + 1], /^\[0:a\]apad=pad_dur=1\.500\[p0\]/);
+});
+
+test("createSpeaker: pace and pauses reach the service", async () => {
+  const sent = [];
+  const fake = async (u, init) => { sent.push(JSON.parse(init.body)); return new Response(new Uint8Array([1]), { headers: { "content-type": "audio/mpeg" } }); };
+  const s = createSpeaker({ url: "http://voice.test", fetch: fake });
+  await s.speak("Slowly.", { preset: "hoshi", pace: 0.75, pauses: { stop: 1.2 } });
+  await s.speak("As it is.", { preset: "hoshi" });
+  assert.deepEqual([sent[0].pace, sent[0].pauses], [0.75, { stop: 1.2 }]);
+  assert.ok(!("pace" in sent[1]) && !("pauses" in sent[1]), "nothing asked: nothing sent");
 });
