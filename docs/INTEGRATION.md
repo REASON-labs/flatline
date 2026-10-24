@@ -147,6 +147,10 @@ app.post("/api/voice/speak", async (c) => {
 });
 ```
 
+Slow guidance (meditation, wind-down) can pass `pace` and `pauses` through the same call:
+`voice.speak(text, { preset, pace: 0.75, pauses: { stop: 1.2 } })` (docs/VOICE.md, "Pace and
+pauses"). Keep the values your app uses to a fixed few: each pace is its own Piper process.
+
 On the page, once: `dixie.configure({ endpoint: "/api/voice/speak" })`. Then `dixie.speak(q)`
 uses her voice (MP3 plays everywhere, including iPhone Safari), resolves `"done"` or `"cancelled"`
 as before, and falls back to the phone's voice if the endpoint fails or takes over 15 s. For a

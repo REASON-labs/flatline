@@ -3,7 +3,8 @@
 // encodes it. Loopback only, no dependencies beyond Node 20+, Piper and ffmpeg.
 //
 //   GET  /         { ok, presets, default, formats }
-//   POST /speak    { text, preset?, format?, tune?, flatten? }  ->  audio (or { error, code })
+//   POST /speak    { text, preset?, format?, tune?, flatten?, pace?, pauses? }  ->  audio (or { error, code })
+//                  pace: × the preset's speed (0.6..1.4; lower is slower); pauses: { stop?, clause?, question? } s
 //
 // A Piper process stays running for each voice in use (the model loads once): presets with the
 // same voice and pace share one. At most FLATLINE_VOICE_MAX_PIPERS run at a time (the least
@@ -78,19 +79,49 @@ export function piperKey(p) {
   return [p.voice, clamp(p.lengthScale, 0.5, 2, 1), clamp(p.noiseScale, 0, 1.5, 0.667), clamp(p.noiseW, 0, 1.5, 0.8)].join("|");
 }
 
+/** The longest pause (seconds) a preset or a request can ask for. */
+const MAX_PAUSE = 3;
+
 /**
  * The pauses (seconds) after a clause, a statement and a question. A preset can set any of them
  * in "pauses"; what it leaves out comes from "sentenceSilence" (the pause after a statement):
  * a clause gets half of it, a question a little more.
  */
 export function pausesOf(p) {
-  const stop = clamp(p.pauses?.stop ?? p.sentenceSilence, 0, 2, 0.25);
+  const stop = clamp(p.pauses?.stop ?? p.sentenceSilence, 0, MAX_PAUSE, 0.25);
   const ms = (n) => Math.round(n * 1000) / 1000;
   return {
     stop: ms(stop),
-    clause: ms(clamp(p.pauses?.clause, 0, 2, stop * 0.5)),
-    question: ms(clamp(p.pauses?.question, 0, 2, stop * 1.15)),
+    clause: ms(clamp(p.pauses?.clause, 0, MAX_PAUSE, stop * 0.5)),
+    question: ms(clamp(p.pauses?.question, 0, MAX_PAUSE, stop * 1.15)),
   };
+}
+
+/**
+ * A request's pace: how fast, relative to the preset (1 = as the preset speaks, 0.75 = slower,
+ * 1.2 = faster). Kept to 0.6..1.4 in steps of 0.05, so requests share a few Pipers rather than
+ * starting one per number. Anything that isn't a number is 1.
+ */
+export function paceOf(v) {
+  return Math.round(clamp(v, 0.6, 1.4, 1) * 20) / 20;
+}
+
+/**
+ * The preset as one request asks for it: its speed divided by the request's pace (Piper's
+ * length scale, kept to 0.5..2) and the request's pauses merged over its own. Everything else
+ * (the voice, the speaker, the sound) is the preset's. Nothing asked for: the preset itself.
+ */
+export function withRequest(p, { pace, pauses } = {}) {
+  const k = paceOf(pace);
+  const askedPauses = pauses && typeof pauses === "object" && !Array.isArray(pauses);
+  if (k === 1 && !askedPauses) return p;
+  const out = { ...p };
+  if (k !== 1) out.lengthScale = Math.round(clamp(clamp(p.lengthScale, 0.5, 2, 1) / k, 0.5, 2, 1) * 1000) / 1000;
+  if (askedPauses) {
+    const base = pausesOf(p);
+    out.pauses = Object.fromEntries(["stop", "clause", "question"].map((k2) => [k2, clamp(pauses[k2], 0, MAX_PAUSE, base[k2])]));
+  }
+  return out;
 }
 
 /** How many Piper processes are running (for tests). */
@@ -183,9 +214,9 @@ function sampleRate(voice) {
 }
 
 /** Text in, encoded audio out. */
-export async function render(presets, { text, preset = defaultPreset(presets), format = "m4a", tune, flatten: flat }) {
-  const p = presets[preset];
-  if (!p) throw Object.assign(new Error(`No preset "${preset}".`), { code: "unknown_preset", status: 404 });
+export async function render(presets, { text, preset = defaultPreset(presets), format = "m4a", tune, flatten: flat, pace, pauses }) {
+  if (!presets[preset]) throw Object.assign(new Error(`No preset "${preset}".`), { code: "unknown_preset", status: 404 });
+  const p = withRequest(presets[preset], { pace, pauses });
   // A preset's "flatten" (or a request's, true or false, to compare) shapes the text first.
   const pieces = segments(text, typeof flat === "boolean" ? flat : p.flatten === true);
   if (!pieces.length) throw Object.assign(new Error("There's nothing to say."), { code: "empty", status: 400 });
@@ -262,7 +293,7 @@ export function createVoiceServer(presets = loadPresets()) {
       if (text.length > MAX_CHARS) return send(res, 413, { error: `Keep it under ${MAX_CHARS} characters.`, code: "too_long" });
       const started = Date.now();
       const preset = typeof body.preset === "string" && body.preset ? body.preset : defaultPreset(presets);
-      const out = await enqueue(() => render(presets, { text, preset, format: body.format ?? "m4a", tune: body.tune, flatten: typeof body.flatten === "boolean" ? body.flatten : undefined }));
+      const out = await enqueue(() => render(presets, { text, preset, format: body.format ?? "m4a", tune: body.tune, flatten: typeof body.flatten === "boolean" ? body.flatten : undefined, pace: body.pace, pauses: body.pauses }));
       log(`spoke ${text.length} chars as ${preset}/${body.format ?? "m4a"} in ${Date.now() - started} ms`);
       return send(res, 200, out.audio, out.type);
     } catch (e) {
