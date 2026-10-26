@@ -11,7 +11,8 @@ const INSTALLER = readFileSync(new URL("../server/install-voice.sh", import.meta
 const DOCS = readFileSync(new URL("../docs/VOICE.md", import.meta.url), "utf8");
 const PLACEHOLDERS = new Set(["name", "n", "time", "title", "who", "changes", "them", "error", "memo"]);
 /** Lines a lock screen may show: never {title}. */
-const TEXT_KEYS = new Set(["briefing.text", "briefing.textEmpty", "event.text", "tomorrow.text", "tomorrow.textClear", "wake.text", "wake.textLate", "wake.riseText", "wake.riseTextLate", "wake.snoozed"]);
+const TEXT_KEYS = new Set(["briefing.text", "briefing.textEmpty", "event.text", "tomorrow.text", "tomorrow.textClear", "wake.text", "wake.textLate", "wake.riseText", "wake.riseTextLate", "wake.snoozed",
+  "pace.text", "pace.textLate", "pace.textNotStarted", "overdue.text"]);
 const isText = (k) => TEXT_KEYS.has(k) || k.startsWith("inbox.") || k === "wake.partner";
 /** Catchphrases and names that would make a character an imitation. */
 const BANNED = [/make it so/i, /\bengage\b/i, /captain's log/i, /\bdave\b/i, /i'm afraid/i, /pod bay/i, /satisfied with your care/i,
@@ -45,6 +46,20 @@ for (const [id, lines] of all) {
     assert.equal(lines.wake.rise.length, 3);
     assert.match(lines.wake.rise[0], /\{time\}/, "the first nudge says the time");
     for (const t of lines.wake.rise) assert.doesNotMatch(t, /important|critical|essential|matter/i, "the ordinary morning never says it was important");
+  });
+  test(`${id}: pick up the pace: four nudges that say the time left or past; overdue never counts days`, () => {
+    const P = lines.pace;
+    assert.equal(P.steps.length, 4);
+    assert.match(P.steps[0], /\{n\}/, "the first nudge says how long is left"); assert.match(P.steps[0], /\{time\}/);
+    assert.match(P.steps[1], /\{time\}/, "at the time, it says the time");
+    for (const t of P.steps.slice(2)) assert.match(t, /\{n\} minutes past/);
+    assert.match(P.text, /\{n\}/); assert.match(P.text, /\{time\}/);
+    assert.match(P.textLate, /\{n\} minutes past \{time\}/);
+    assert.match(P.notStarted, /\{time\}/); assert.match(P.textNotStarted, /\{time\}/);
+    for (const t of [...P.steps, P.text, P.textLate, P.notStarted, P.textNotStarted]) assert.doesNotMatch(t, /\blate\b|\bslow\b|again and again|every (day|time|morning)/i, `pace: ${t}`);
+    assert.match(lines.overdue.spoken, /\{title\}/); assert.match(lines.overdue.text, /\{n\}/);
+    assert.doesNotMatch(lines.overdue.spoken, /\{n\}/, "the spoken nudge doesn't count anything");
+    for (const t of [lines.overdue.spoken, lines.overdue.text]) assert.doesNotMatch(t, /\bdays\b|\bweeks?\b|\bslow\b|\bsince\b/i, `overdue: ${t}`);
   });
   test(`${id}: short sentences ending in full stops; no commas, "!", "?" or emoji`, () => {
     for (const [k, t] of entries(lines)) {

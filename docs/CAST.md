@@ -63,6 +63,17 @@ Placeholders: `{name}` (the app), `{n}` (a number, as it should be said), `{time
 The wake-up has eight steps: at the time, then 5, 10, 20, 30, 40, 50 and 60 minutes past (`wake.steps`, for a morning marked important).
 An ordinary morning is `wake.rise`: three nudges, at the time, 5 and 15 minutes past, then quiet; `wake.snoozed` answers "10 more minutes" (0.5.0).
 
+**Pick up the pace (0.7.0).** `pace` is for someone getting ready for work who is running out of time, in the
+character's own voice but firmer: `pace.steps` has four spoken nudges (at about three quarters of their target with
+`{n}` minutes left and `{time}` out the door, at `{time}`, then 10 and 20 minutes past as `{n} minutes past {time}`),
+`pace.text` and `pace.textLate` are the lock-screen versions, and `pace.notStarted` / `pace.textNotStarted` are for
+when it's time to start getting ready and they haven't. Firm is still never cruel: no "late", no "slow", nothing
+about other mornings. An app should send these only to someone who switched them on, and stop the moment they're
+ready or out the door.
+
+**An important to-do that's overdue (0.7.0).** `overdue.spoken` names it (`{title}`, spoken only) and says to do it
+today; `overdue.text` is the count (`{n}`) for a lock screen. Neither counts days.
+
 `c.sample` is one line in character, for a "hear a sample" button. `COMPARE_LINES` are the same
 few lines for every character, for comparing them by ear: `tools/cast-samples.mjs` makes an MP3
 of each through a voice service (`FLATLINE_VOICE_URL=http://127.0.0.1:8087 node tools/cast-samples.mjs out/`).

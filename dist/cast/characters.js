@@ -62,6 +62,25 @@ export const flatline = {
             snoozed: "{n} minutes. Then I'm back.",
             partner: PARTNER,
         },
+        // Getting ready, running out of time: firmer as it goes, never cruel. At about three quarters of the target, at the
+        // out-the-door time, then 10 and 20 minutes past (0.7.0).
+        pace: {
+            steps: [
+                "{n} minutes left. Out the door by {time}. Move.",
+                "That's {time}. Out the door. Now.",
+                "{n} minutes past {time}. Shoes. Keys. Go.",
+                "{n} minutes past. Last word from me. Out the door.",
+            ],
+            text: "{n} minutes left. Out the door by {time}.",
+            textLate: "{n} minutes past {time}. Out the door.",
+            notStarted: "Flatline. Time to get ready. Out the door by {time}. Start.",
+            textNotStarted: "Time to get ready. Out the door by {time}.",
+        },
+        // An important to-do that's overdue (0.7.0).
+        overdue: {
+            spoken: "{title}. It's overdue and it matters. Today. Do it.",
+            text: "Important and overdue: {n}. Do one today.",
+        },
         inbox: {
             help: "{name} here. Text me or send a voice memo. I'll line up the changes. YES runs them. NO kills them. STOP shuts me up.",
             ready: "{changes} ready. Reply YES to run {them}. NO to kill {them}. Or open {name} and look first.",
@@ -147,6 +166,25 @@ export const kestrel = {
             riseTextLate: "Rise and shine. {n} minutes past {time}.",
             snoozed: "{n} minutes. Then I'm back on the line.",
             partner: PARTNER,
+        },
+        // Getting ready, running out of time: firmer as it goes, never cruel. At about three quarters of the target, at the
+        // out-the-door time, then 10 and 20 minutes past (0.7.0).
+        pace: {
+            steps: [
+                "Kestrel. {n} minutes to departure. Out the door by {time}.",
+                "It's {time}. Departure. Move to the door.",
+                "{n} minutes past {time}. Shoes on. Go.",
+                "{n} minutes past. Final word. Out the door.",
+            ],
+            text: "{n} minutes to departure. Out the door by {time}.",
+            textLate: "{n} minutes past {time}. Move to the door.",
+            notStarted: "Kestrel. The get-ready window is open. Out the door by {time}. Begin.",
+            textNotStarted: "Time to get ready. Out the door by {time}.",
+        },
+        // An important to-do that's overdue (0.7.0).
+        overdue: {
+            spoken: "{title}. Overdue and flagged important. Clear it today.",
+            text: "Important and overdue: {n}. Clear one today.",
         },
         inbox: {
             help: "{name}. Send text or a voice memo. I'll prepare the changes. YES to execute. NO to abort. STOP ends contact.",
@@ -234,6 +272,25 @@ export const iris = {
             snoozed: "{n} more minutes. Then up.",
             partner: PARTNER,
         },
+        // Getting ready, running out of time: firmer as it goes, never cruel. At about three quarters of the target, at the
+        // out-the-door time, then 10 and 20 minutes past (0.7.0).
+        pace: {
+            steps: [
+                "Iris here. {n} minutes left. You leave at {time}. I'm keeping time for you.",
+                "It's {time}. This is when you leave. Shall we go.",
+                "{n} minutes past {time}. Please put your shoes on now.",
+                "{n} minutes past. I won't ask again. Please leave now.",
+            ],
+            text: "{n} minutes left. You leave at {time}.",
+            textLate: "{n} minutes past {time}. Please head out now.",
+            notStarted: "Hello. It's time to get ready. You leave at {time}. I'll keep time.",
+            textNotStarted: "Time to get ready. You leave at {time}.",
+        },
+        // An important to-do that's overdue (0.7.0).
+        overdue: {
+            spoken: "{title} is overdue. You said it was important. I think today is the day.",
+            text: "Important and overdue: {n}. Today would be a good day.",
+        },
         inbox: {
             help: "This is {name}. Write to me or send a voice memo. I'll prepare the changes. Reply YES to apply them. NO to set them aside. STOP and I'll be silent.",
             ready: "I've prepared {changes}. Reply YES to apply {them}. NO to set {them} aside. Or open {name} and look first.",
@@ -319,6 +376,25 @@ export const ashford = {
             riseTextLate: "Rise and shine. {n} minutes past {time}.",
             snoozed: "{n} minutes more. Then up we get.",
             partner: PARTNER,
+        },
+        // Getting ready, running out of time: firmer as it goes, never cruel. At about three quarters of the target, at the
+        // out-the-door time, then 10 and 20 minutes past (0.7.0).
+        pace: {
+            steps: [
+                "Ashford. {n} minutes remain. The door at {time}. Do keep moving.",
+                "It's {time}. The door awaits. Coat and keys.",
+                "{n} minutes past {time}. Shoes. Keys. Out we go.",
+                "{n} minutes past. I shan't say it again. Do go.",
+            ],
+            text: "{n} minutes remain. Out the door by {time}.",
+            textLate: "{n} minutes past {time}. Do head out.",
+            notStarted: "Ashford. Time to get ready. The door at {time}. Shall we begin.",
+            textNotStarted: "Time to get ready. Out the door by {time}.",
+        },
+        // An important to-do that's overdue (0.7.0).
+        overdue: {
+            spoken: "{title} is overdue. And it matters. Today. If you please.",
+            text: "Important and overdue: {n}. Today if you please.",
         },
         inbox: {
             help: "{name} here. Send a message or a voice memo and I'll prepare the changes. YES to proceed. NO to decline. STOP and I'll stay quiet.",
@@ -406,6 +482,25 @@ export const hoshi = {
             snoozed: "{n} more minutes. Then up. Okay.",
             partner: PARTNER,
         },
+        // Getting ready, running out of time: firmer as it goes, never cruel. At about three quarters of the target, at the
+        // out-the-door time, then 10 and 20 minutes past (0.7.0).
+        pace: {
+            steps: [
+                "Hoshi here. {n} minutes left. Out the door by {time}. Keep going.",
+                "It's {time}. Time to head out. Shoes on now.",
+                "{n} minutes past {time}. Let's go now. Keys and out the door.",
+                "{n} minutes past. Last nudge from me. Out the door now.",
+            ],
+            text: "{n} minutes left. Out the door by {time}.",
+            textLate: "{n} minutes past {time}. Time to head out.",
+            notStarted: "Hi. It's Hoshi. Time to get ready. Out the door by {time}. Let's start.",
+            textNotStarted: "Time to get ready. Out the door by {time}.",
+        },
+        // An important to-do that's overdue (0.7.0).
+        overdue: {
+            spoken: "{title} is overdue. It's an important one. Let's do it today.",
+            text: "Important and overdue: {n}. Let's do one today.",
+        },
         inbox: {
             help: "Hi. It's {name}. Send a message or a voice memo and I'll get things ready. YES to save them. NO to leave them. STOP and I'll be quiet.",
             ready: "I have {changes} ready. Reply YES to save {them}. NO to leave {them}. Or open {name} and look first.",
@@ -491,6 +586,25 @@ export const calder = {
             riseTextLate: "Rise and shine. {n} minutes past {time}.",
             snoozed: "{n} minutes. Then on your feet.",
             partner: PARTNER,
+        },
+        // Getting ready, running out of time: firmer as it goes, never cruel. At about three quarters of the target, at the
+        // out-the-door time, then 10 and 20 minutes past (0.7.0).
+        pace: {
+            steps: [
+                "Captain Calder. {n} minutes to departure. Out the door by {time}.",
+                "It's {time}. Time to depart. To the door.",
+                "{n} minutes past {time}. Shoes on. Depart now.",
+                "{n} minutes past. Final order. Out the door.",
+            ],
+            text: "{n} minutes to departure. Out the door by {time}.",
+            textLate: "{n} minutes past {time}. Depart now.",
+            notStarted: "Captain Calder. Time to get ready. Departure at {time}. Begin.",
+            textNotStarted: "Time to get ready. Out the door by {time}.",
+        },
+        // An important to-do that's overdue (0.7.0).
+        overdue: {
+            spoken: "{title}. Overdue and essential. See to it today.",
+            text: "Important and overdue: {n}. See to one today.",
         },
         inbox: {
             help: "{name}. Send a message or a voice memo and I'll prepare the changes. YES to carry them out. NO to belay. STOP ends transmission.",
@@ -578,6 +692,25 @@ export const nettle = {
             snoozed: "{n} minutes. Then I'm back. Don't test me.",
             partner: PARTNER,
         },
+        // Getting ready, running out of time: firmer as it goes, never cruel. At about three quarters of the target, at the
+        // out-the-door time, then 10 and 20 minutes past (0.7.0).
+        pace: {
+            steps: [
+                "Nettle. {n} minutes left. Out the door by {time}. Hurry up.",
+                "It's {time}. Shoes. Now. Out the door.",
+                "{n} minutes past {time}. Keys. Door. Go. I'm not kidding.",
+                "{n} minutes past. Last one from me. Out. The. Door.",
+            ],
+            text: "{n} minutes left. Out the door by {time}.",
+            textLate: "{n} minutes past {time}. Shoes. Now.",
+            notStarted: "Nettle. It's get-ready time. Out the door by {time}. Start. Now.",
+            textNotStarted: "Time to get ready. Out the door by {time}.",
+        },
+        // An important to-do that's overdue (0.7.0).
+        overdue: {
+            spoken: "{title}. Still overdue. It's the important one. Today. Go.",
+            text: "Important and overdue: {n}. Pick one. Today.",
+        },
         inbox: {
             help: "{name}. Text me or send a voice memo. I'll sort out the changes. YES to do them. NO to toss them. STOP and I'll go quiet.",
             ready: "{changes} ready. Reply YES to do {them}. NO to toss {them}. Or open {name} and look. Your call.",
@@ -654,6 +787,25 @@ export const plainLines = {
         riseTextLate: "Rise and shine. {n} minutes past {time}. Time to get up.",
         snoozed: "{n} more minutes. Then time to get up.",
         partner: PARTNER,
+    },
+    // Getting ready, running out of time: firmer as it goes, never cruel. At about three quarters of the target, at the
+    // out-the-door time, then 10 and 20 minutes past (0.7.0).
+    pace: {
+        steps: [
+            "{n} minutes left. Out the door by {time}.",
+            "It's {time}. Time to leave.",
+            "{n} minutes past {time}. Time to head out now.",
+            "{n} minutes past. Please head out now.",
+        ],
+        text: "{n} minutes left. Out the door by {time}.",
+        textLate: "{n} minutes past {time}. Time to head out.",
+        notStarted: "Time to get ready. Out the door by {time}.",
+        textNotStarted: "Time to get ready. Out the door by {time}.",
+    },
+    // An important to-do that's overdue (0.7.0).
+    overdue: {
+        spoken: "{title} is overdue. It's marked important. Try to do it today.",
+        text: "Important and overdue: {n}. Open the app.",
     },
     inbox: {
         help: "{name}. Send a message or a voice memo and I'll get the changes ready. Reply YES to apply them. NO to drop them. STOP turns messages off.",
