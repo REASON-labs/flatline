@@ -87,6 +87,30 @@ export interface LineSet {
     /** To their partner, after an hour, only if they allowed it. {who}, {time}. Plain, kind, and no more. */
     partner: string;
   };
+  /**
+   * Getting ready for work and running out of time (0.7.0): firmer as it goes, never cruel, never counting
+   * past mornings. An app sends these only to someone who switched them on.
+   */
+  pace: {
+    /** Spoken, one per nudge: at about three quarters of the target ({n} minutes left, {time} out the door),
+     *  at {time}, then 10 and 20 minutes past ({n} minutes past {time}). */
+    steps: readonly string[];
+    /** Text, before the out-the-door time. {n} minutes left, {time}. */
+    text: string;
+    /** Text, after it. {n} minutes past {time}. */
+    textLate: string;
+    /** Spoken: it's time to start getting ready and they haven't started. {time} out the door. */
+    notStarted: string;
+    /** Text: the same. {time}. */
+    textNotStarted: string;
+  };
+  /** An important to-do that's overdue (0.7.0): firm, once in a while, never a count of days. */
+  overdue: {
+    /** Spoken: {title}. */
+    spoken: string;
+    /** Text: {n} important to-dos overdue. Counts only, never {title}. */
+    text: string;
+  };
   /** Replies to a message in (all text). YES, NO and STOP are the words an app listens for. */
   inbox: {
     help: string;
