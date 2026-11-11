@@ -2,4 +2,5 @@
 // through the backends the app lists.
 export { createTranscriber, cleanTranscript, fileNameFor } from "./transcribe.js";
 export { createSpeaker, SPEAK_TYPES, splitText, joinWavs } from "./speak.js";
+export { sniffAudio, adtsToM4a } from "./aac.js";
 //# sourceMappingURL=index.js.map

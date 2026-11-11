@@ -8,7 +8,7 @@ reachable from outside the server.
 
 ```jsonc
 // package.json: once the repository is public, or wherever your server can read it
-"dependencies": { "flatline": "github:REASON-labs/flatline#v0.8.0" }
+"dependencies": { "flatline": "github:REASON-labs/flatline#v0.8.1" }
 ```
 
 The built code is committed, so installing needs no build step and no dev tools. Pin a tag.
@@ -18,7 +18,7 @@ release's tarball instead (it's attached to each GitHub release, or made with `n
 in your repository:
 
 ```jsonc
-"dependencies": { "flatline": "file:vendor/flatline-0.8.0.tgz" }
+"dependencies": { "flatline": "file:vendor/flatline-0.8.1.tgz" }
 ```
 
 and make sure your deploy copies `vendor/` to the server before `npm ci`.
@@ -123,7 +123,11 @@ if (r.ok) log(`transcribed by backend ${r.via.index} (${r.via.kind}) in ${r.ms} 
   box with and without its own services. `configured` is true if any is left; `health()` is
   true if any is up (for `"openai"`, `GET {url}/models` answers 200).
 - **`"openai"` for speech to text** posts multipart to `{url}/audio/transcriptions`: `file`,
-  `model`, `response_format=json`, `temperature=0`, and `language` when you set one.
+  `model`, `response_format=json`, `temperature=0`, and `language` when you set one. Such
+  services go by what a file is and what it is called, so the file is named for what its first
+  bytes say it is, whatever content type came with it. A bare AAC stream (ADTS, ".aac": voice
+  notes from some messengers), which they refuse, is put into an MP4 file first, frame for
+  frame, with nothing decoded (0.8.1).
 - **`"openai"` for the voice** posts JSON to `{url}/audio/speech`: `model`, `input`, `voice`,
   `response_format: "wav"`. Text over the backend's `maxChars` (default 200) is split at
   sentence ends (then commas, then spaces) and the WAVs joined into one. **The audio is always
