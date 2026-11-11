@@ -97,7 +97,7 @@ export function createTranscriber(opts: TranscriberOptions): Transcriber {
   // A backend without an address is left out; `index` stays its place in the list as given.
   const ready: Ready[] = listed
     .map((backend, index) => ({ backend, base: baseOf(backend?.url), via: { index, kind: backend?.kind } }))
-    .filter((b) => b.base && (b.backend.kind === "whispercpp" || b.backend.kind === "openai"));
+    .filter((b) => b.backend && b.base && (b.backend.kind === "whispercpp" || b.backend.kind === "openai"));
 
   async function attempt({ backend, base, via }: Ready, audio: Uint8Array, contentType: string | undefined): Promise<Attempt> {
     const openai = backend.kind === "openai";

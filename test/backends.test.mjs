@@ -173,6 +173,7 @@ test("stt: configured and healthy if any backend is; one without an address is l
   const up = await standIn((q) => q.path === "/v1/models" ? [200, { data: [] }] : [404, {}]);
   const refused = await standIn(() => [401, {}]);
   assert.equal(createTranscriber({ backends: [] }).configured, false);
+  assert.equal(createTranscriber({ backends: [null, { kind: "other", url: "http://127.0.0.1:1" }] }).configured, false);
   assert.equal(createTranscriber({ backends: [whisper(""), { kind: "openai", url: " ", model: "m" }] }).configured, false);
   assert.equal(createTranscriber({ backends: [whisper(undefined), cloud(up.url)] }).configured, true);
   assert.equal(await createTranscriber({ backends: [whisper(DEAD), cloud(up.url, { apiKey: KEY })] }).health(), true);
@@ -359,4 +360,5 @@ test("voice: a 0.7-style caller is one flatline backend; configured and healthy 
   assert.equal(await createSpeaker({ backends: [local(DEAD), voice(models.url)] }).health(), true);
   assert.equal(await createSpeaker({ backends: [local(DEAD), voice(DEAD)] }).health(), false);
   assert.equal((await createSpeaker({ backends: [] }).speak("hi")).code, "unavailable");
+  assert.equal(createSpeaker({ backends: [null, { kind: "other", url: "http://127.0.0.1:1" }] }).configured, false);
 });

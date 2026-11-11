@@ -180,7 +180,7 @@ export function createSpeaker(opts: SpeakerOptions): Speaker {
   // A backend without an address is left out; `index` stays its place in the list as given.
   const ready: Ready[] = listed
     .map((backend, index) => ({ backend, base: baseOf(backend?.url), via: { index, kind: backend?.kind } }))
-    .filter((b) => b.base && (b.backend.kind === "flatline" || b.backend.kind === "openai"));
+    .filter((b) => b.backend && b.base && (b.backend.kind === "flatline" || b.backend.kind === "openai"));
 
   async function info(base: string): Promise<{ presets: string[] } | null> {
     try {
