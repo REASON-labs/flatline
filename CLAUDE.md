@@ -2,7 +2,8 @@
 
 Self-hosted voice for web apps: `server/install.sh` (whisper.cpp on loopback, :8086),
 `server/install-voice.sh` (Piper + ffmpeg presets on loopback, :8087, `server/voice/`),
-`flatline/server` (createTranscriber, createSpeaker), `flatline/browser` (record until silence,
+`flatline/server` (createTranscriber, createSpeaker; each takes one service or `backends`, tried
+in order, of which one may be an OpenAI-style service the app configures), `flatline/browser` (record until silence,
 upload, and `dixie`, the speaker: the server's voice or the phone's), and `flatline/cast` (the
 voice characters: Flatline, the default and once called Dixie, Kestrel, Iris, Ashford, Hoshi,
 Captain Calder and Nettle; each a preset, a tone guide and a line set; docs/CAST.md).
@@ -11,8 +12,10 @@ Apps that use it (Mindtop and its forks) keep only a thin adapter; anything reus
 
 ## Non-negotiables
 
-1. **Audio never leaves the user's own server.** No third-party speech APIs, no telemetry. The
-   voices are made on that server; the fallback (the phone's speech) prefers on-device voices.
+1. **Audio stays on the user's own server by default.** A cloud speech or voice service is used
+   only when the app configures one; Flatline never adds one by itself. No telemetry.
+   By default the voices are made on that server; the fallback (the phone's speech) prefers
+   on-device voices. Keys reach only the backend they were set for, and never an error or a log.
 2. **Both services listen on loopback only** (whisper :8086, voice :8087). The app's endpoint is
    the gate; never document exposing them.
 3. **No runtime dependencies.** Dev tools only (TypeScript, Playwright).

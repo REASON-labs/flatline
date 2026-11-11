@@ -63,6 +63,25 @@ curl -s -F file=@memo.m4a -F response_format=json http://127.0.0.1:8086/inferenc
 
 From an app, `createTranscriber({ url }).health()` is a cheap "is it up?".
 
+## Using a cloud backend
+
+This service is the default, and the only place audio goes unless your app says otherwise. An
+app can list it with other backends, tried in order, for when this box is down or busy, or use
+a service with OpenAI's transcription API instead of running whisper here at all:
+
+```js
+createTranscriber({ backends: [
+  { kind: "whispercpp", url: "http://127.0.0.1:8086" },
+  { kind: "openai", url: "https://api.example.com/v1", model: "whisper-large-v3", apiKey: process.env.SPEECH_API_KEY },
+] });
+```
+
+The audio then leaves your server whenever that backend is the one that answers (`via` in the
+result says which did). Flatline never adds such a backend by itself. The rules for moving on
+to the next one, and the request it sends, are in [INTEGRATION.md](INTEGRATION.md#backends). To
+stop this service without removing it: `sudo systemctl disable --now flatline-whisper`
+(`enable --now` brings it back).
+
 ## Security
 
 - Never expose the port to the internet or put it behind a public proxy: whisper's server has no

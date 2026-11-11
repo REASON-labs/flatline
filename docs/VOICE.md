@@ -3,7 +3,8 @@
 `server/install-voice.sh` installs **flatline-voice**: [Piper](https://github.com/rhasspy/piper), a
 fast speech engine that runs on the CPU, behind a small Node service that gives each **preset**
 its sound with ffmpeg. It listens on **127.0.0.1:8087** only. Text goes to it and audio comes
-back; nothing is sent anywhere else.
+back; nothing is sent anywhere else (unless your app lists a cloud backend as well: see
+[Using a cloud backend](#using-a-cloud-backend)).
 
 Each **character** in the cast ([CAST.md](CAST.md)) has a preset: **flatline** (the default), **kestrel**,
 **iris**, **ashford**, **hoshi**, **calder** and **nettle**, plus **plain** (Flatline's voice with no effects).
@@ -72,6 +73,35 @@ Codes: `unavailable`, `empty`, `too_long` (over `maxChars`, default 1500), `unkn
 `busy`, `timeout`, `bad_response`. In the browser, `dixie.configure({ endpoint: "/api/voice/speak" })`
 makes `dixie.speak()` use this voice through your app's endpoint (see
 [INTEGRATION.md](INTEGRATION.md)), falling back to the phone's voice when the server can't speak.
+
+## Using a cloud backend
+
+`createSpeaker` also takes `backends`, tried in order: this service, and any service with
+OpenAI's speech API (`POST {url}/audio/speech`), for when this one is down or busy:
+
+```js
+const voice = createSpeaker({ backends: [
+  { kind: "flatline", url: process.env.FLATLINE_VOICE_URL },
+  { kind: "openai", url: "https://api.example.com/v1", model: "a-speech-model", voice: "a-voice", apiKey: process.env.SPEECH_API_KEY },
+] });
+const r = await voice.speak("Check in before noon.", { preset: "kestrel", format: "m4a" });
+if (r.ok && r.via.kind === "openai") console.log(r.format, r.note);   // "wav", "Asked for m4a; this backend answers WAV."
+```
+
+What differs with the `"openai"` kind:
+
+- **It is not the cast.** The voice is the one named in the backend; presets, `tune`, `pace`
+  and `pauses` aren't sent. Choose a voice whose licence lets you use it, and don't pick one
+  that imitates a real person.
+- **The audio is WAV**, whatever format was asked for; the result's `format`, `contentType` and
+  `note` say so. Flatline doesn't convert it (that would need ffmpeg in your app).
+- **Long text is split.** Some services take little text at a time (`maxChars`, default 200
+  characters): the text is cut at sentence ends, then commas, then spaces, sent in order, and
+  the WAVs joined into one.
+- **The text leaves your server** when that backend answers. Flatline never adds one by itself.
+
+The order, the errors that move on to the next backend and `via` are in
+[INTEGRATION.md](INTEGRATION.md#backends).
 
 The service's own API, for curl:
 
