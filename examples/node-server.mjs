@@ -23,6 +23,6 @@ createServer(async (req, res) => {
   }
   const r = await stt.transcribe(new Uint8Array(Buffer.concat(chunks)), req.headers["content-type"]);
   if (r.ok) return json(res, 200, { text: r.text });
-  const status = { unavailable: 503, timeout: 504, too_large: 413, empty: 400, bad_response: 502 }[r.code] ?? 500;
+  const status = { unavailable: 503, timeout: 504, too_large: 413, empty: 400, bad_response: 502, busy: 503 }[r.code] ?? 500;
   json(res, status, { error: r.error });
 }).listen(Number(process.env.PORT ?? 3030), "127.0.0.1", () => console.log(`listening on 127.0.0.1:${process.env.PORT ?? 3030}`));

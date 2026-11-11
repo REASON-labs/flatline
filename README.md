@@ -1,14 +1,16 @@
 # Flatline
 
 Self-hosted voice for web apps. Someone talks to your app on their phone; your own server turns
-it into text; your app can answer out loud. **The audio never leaves your machine.**
+it into text; your app can answer out loud. **The audio stays on your own server by default.**
+A cloud speech or voice service is used only when your app configures one; Flatline never adds
+one by itself.
 
 Small pieces, no runtime dependencies:
 
 | Piece | Runs | Does |
 |---|---|---|
 | **Speech-to-text service** (`server/install.sh`) | your server | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) at a pinned release, as a hardened systemd service on loopback |
-| **`flatline/server`** | your app's backend (Node 20+) | sends audio to that service and returns clean text, with time and size limits and plain error codes |
+| **`flatline/server`** | your app's backend (Node 20+) | sends audio to that service and returns clean text, with time and size limits and plain error codes; or to a list of **backends**, tried in order |
 | **Text-to-speech service** (`server/install-voice.sh`) | your server | [Piper](https://github.com/rhasspy/piper) at a pinned release, with a preset per character that gives the voice its sound through ffmpeg |
 | **`flatline/browser`** | the phone's browser | records an answer (or a three-minute memo) and **stops by itself when the person stops talking**; sends it to your backend; and `dixie`, the speaker, which reads text aloud with the server's voice, or the phone's own when that isn't available |
 | **`flatline/cast`** | anywhere (data) | **the cast**: six voice characters, each a sound (a preset), a tone guide for an assistant model, and a line set (briefings, reminders, wake-up calls, replies). [docs/CAST.md](docs/CAST.md) |
@@ -34,12 +36,12 @@ Whisper listens on loopback only.
 ## Install
 
 ```jsonc
-"dependencies": { "flatline": "github:REASON-labs/flatline#v0.7.0" }
+"dependencies": { "flatline": "github:REASON-labs/flatline#v0.8.0" }
 ```
 
 The built code is committed, so installing needs no build and no dev tools; pin a tag. A server
 that can't read the repository can use the tarball attached to each release instead
-(`"flatline": "file:vendor/flatline-0.7.0.tgz"`). See [docs/INTEGRATION.md](docs/INTEGRATION.md).
+(`"flatline": "file:vendor/flatline-0.8.0.tgz"`). See [docs/INTEGRATION.md](docs/INTEGRATION.md).
 
 ## Quick start
 
@@ -65,6 +67,25 @@ const r = await stt.transcribe(audioBytes, request.headers["content-type"]);
 if (r.ok) reply({ text: r.text });
 else reply({ error: r.error }, r.code === "unavailable" ? 503 : 400);
 ```
+
+### Backends (0.8)
+
+Instead of one `url`, give a list, tried in order: your own services, and, if you choose, any
+service with OpenAI's audio API (one you host, or a cloud one).
+
+```js
+const stt = createTranscriber({ backends: [
+  { kind: "whispercpp", url: process.env.FLATLINE_URL },                         // yours, first
+  { kind: "openai", url: "https://api.example.com/v1", model: "whisper-large-v3", apiKey: process.env.SPEECH_API_KEY },
+] });
+const r = await stt.transcribe(audioBytes, type);
+if (r.ok) console.log(r.via);   // { index: 0, kind: "whispercpp" }: which one answered
+```
+
+The next backend is tried only when one can't be reached, times out, or answers 429 or 5xx;
+never for audio that is empty or too large, or any other 4xx. `createSpeaker({ backends })` works
+the same way (`"flatline"` and `"openai"` kinds). `{ url }` alone still works exactly as before.
+See [docs/INTEGRATION.md](docs/INTEGRATION.md#backends).
 
 A complete minimal server is in [examples/node-server.mjs](examples/node-server.mjs).
 For the voices, see [docs/VOICE.md](docs/VOICE.md): install them, tune the presets, and the licences.
@@ -94,7 +115,13 @@ show): [docs/INTEGRATION.md](docs/INTEGRATION.md). Moving a box from an older ha
 
 ## Privacy
 
-- Audio goes from the phone to **your** server and to whisper on loopback. No third party hears it.
+- By default, audio goes from the phone to **your** server and to whisper on loopback. No third
+  party hears it.
+- A cloud speech or voice service is used only when your app configures one (an `"openai"`
+  backend with that service's address). Flatline never adds one by itself, and has no built-in
+  address for any. If you configure one, the audio you transcribe, or the text you speak, goes
+  to that service under its terms: tell the people who use your app.
+- No telemetry. A backend's key is sent to that backend only, and never appears in an error.
 - Nothing in Flatline stores audio. What your app keeps is up to your app.
 - Without a server voice, `dixie` speaks with the phone's own voices (`speechSynthesis`), so the
   text it reads isn't sent anywhere by Flatline. (Some browsers offer network voices; it prefers
