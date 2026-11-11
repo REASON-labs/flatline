@@ -3,3 +3,4 @@ export type { Transcriber, TranscriberOptions, TranscribeResult, TranscribeError
 export { createSpeaker, SPEAK_TYPES, splitText, joinWavs } from "./speak.js";
 export type { Speaker, SpeakerOptions, SpeakOptions, SpeakResult, SpeakErrorCode, SpeakFormat, Tune, Pauses, VoiceBackend, VoiceVia } from "./speak.js";
 export type { Via } from "./backend.js";
+export { sniffAudio, adtsToM4a } from "./aac.js";

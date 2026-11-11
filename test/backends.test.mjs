@@ -4,7 +4,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { createTranscriber, createSpeaker, splitText, joinWavs } from "../dist/server/index.js";
+import { createTranscriber, createSpeaker, splitText, joinWavs, sniffAudio, adtsToM4a } from "../dist/server/index.js";
 
 const KEY = "test-key-0123456789-not-real";
 const DEAD = "http://127.0.0.1:9";
@@ -187,6 +187,95 @@ test("stt: configured and healthy if any backend is; one without an address is l
   // `backends` wins over `url`.
   const both = await createTranscriber({ url: DEAD, backends: [whisper(s.url)] }).transcribe(audio);
   assert.equal(both.ok, true);
+});
+
+// --- what phones send ----------------------------------------------------------------------------
+
+/** A bare AAC stream (ADTS): `n` frames of `size` bytes each, mono 16 kHz AAC-LC, frame i filled with i + 1. */
+function adts(n, size = 20, { crc = false } = {}) {
+  const parts = [];
+  for (let i = 0; i < n; i++) {
+    const header = crc ? 9 : 7;
+    const len = header + size;
+    const h = Buffer.alloc(header);
+    h[0] = 0xff; h[1] = crc ? 0xf0 : 0xf1;
+    h[2] = (1 << 6) | (8 << 2) | 0;            // AAC-LC, 16 kHz
+    h[3] = (1 << 6) | ((len >> 11) & 3);       // one channel
+    h[4] = (len >> 3) & 255; h[5] = ((len & 7) << 5) | 0x1f; h[6] = 0xfc;
+    parts.push(h, Buffer.alloc(size, i + 1));
+  }
+  return Buffer.concat(parts);
+}
+const find = (b, type) => Buffer.from(b).indexOf(Buffer.from(type, "latin1"));
+
+test("sniffAudio: what a recording is, from its first bytes", () => {
+  const m4a = Buffer.concat([Buffer.from([0, 0, 0, 28]), Buffer.from("ftypM4A isommp42")]);
+  assert.equal(sniffAudio(m4a), "m4a");
+  assert.equal(sniffAudio(adts(2)), "aac");
+  assert.equal(sniffAudio(adts(2, 20, { crc: true })), "aac");
+  assert.equal(sniffAudio(wav(4)), "wav");
+  assert.equal(sniffAudio(Buffer.from("OggS\0\x02 and some more bytes", "latin1")), "ogg");
+  assert.equal(sniffAudio(Buffer.from("fLaC and some more bytes")), "flac");
+  assert.equal(sniffAudio(Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3, 4, 5, 6, 7, 8])), "webm");
+  assert.equal(sniffAudio(Buffer.from("ID3\x04 and some more bytes", "latin1")), "mp3");
+  assert.equal(sniffAudio(Buffer.from([0xff, 0xfb, 0x90, 0x64, 0, 0, 0, 0, 0, 0, 0, 0])), "mp3");
+  assert.equal(sniffAudio(Buffer.from("hello, not audio")), null);
+  assert.equal(sniffAudio(new Uint8Array([1, 2, 3])), null);
+});
+
+test("adtsToM4a: the same frames in an MP4 file; anything that isn't a clean stream is left alone", () => {
+  const out = Buffer.from(adtsToM4a(adts(5, 20)));
+  assert.equal(sniffAudio(out), "m4a");
+  for (const type of ["ftyp", "moov", "mvhd", "trak", "mdia", "mdhd", "hdlr", "stsd", "mp4a", "esds", "stts", "stsc", "stsz", "stco", "mdat"]) assert.ok(find(out, type) > 0, type);
+  // The frames, without their headers, in order, where stco says they start.
+  const mdat = find(out, "mdat");
+  assert.equal(out.readUInt32BE(mdat - 4), 8 + 100);
+  assert.equal(out.length, mdat + 4 + 100);
+  assert.equal(out.readUInt32BE(find(out, "stco") + 12), mdat + 4);
+  assert.deepEqual([...out.subarray(mdat + 4)], [1, 2, 3, 4, 5].flatMap((v) => new Array(20).fill(v)));
+  // 16 kHz in the track's clock; five frames of 1024 samples; five sizes of 20.
+  const mdhd = find(out, "mdhd");
+  assert.deepEqual([out.readUInt32BE(mdhd + 16), out.readUInt32BE(mdhd + 20)], [16000, 5120]);
+  const stsz = find(out, "stsz");
+  assert.deepEqual([out.readUInt32BE(stsz + 12), out.readUInt32BE(stsz + 16), out.readUInt32BE(stsz + 32)], [5, 20, 20]);
+  // AAC-LC (2), rate index 8, one channel: 00010 1000 0001 000.
+  const esds = find(out, "esds");
+  assert.deepEqual([...out.subarray(esds + 8 + 5 + 15 + 2, esds + 8 + 5 + 15 + 4)], [0x14, 0x08]);
+  // With checksums (9-byte headers), the same frames come out.
+  assert.deepEqual([...Buffer.from(adtsToM4a(adts(5, 20, { crc: true }))).subarray(-100)], [...out.subarray(-100)]);
+  // A cut-off last frame is dropped; the rest is kept.
+  const cut = Buffer.from(adtsToM4a(adts(5, 20).subarray(0, 5 * 27 - 6)));
+  assert.equal(cut.readUInt32BE(find(cut, "stsz") + 12), 4);
+  assert.equal(adtsToM4a(Buffer.from("not an aac stream at all")), null);
+  assert.equal(adtsToM4a(Buffer.concat([adts(2), Buffer.from("junk in the middle"), adts(2)])), null);
+  assert.equal(adtsToM4a(wav(10)), null);
+  assert.equal(adtsToM4a(new Uint8Array()), null);
+});
+
+test("stt: a voice note that is a bare AAC stream goes to an \"openai\" backend as an MP4 file; whisper.cpp gets it as it is", async () => {
+  const s = await standIn(says("got it"));
+  const note = adts(6, 30);
+  const r = await createTranscriber({ backends: [cloud(s.url)] }).transcribe(note, "audio/aac");
+  assert.equal(r.text, "got it");
+  assert.match(s.seen[0].text, /name="file"; filename="audio\.m4a"\r\nContent-Type: audio\/mp4\r\n\r\n\0\0\0.ftypM4A /);
+  assert.ok(s.seen[0].body.includes(Buffer.alloc(30, 6)));
+  await createTranscriber({ backends: [whisper(s.url)] }).transcribe(note, "audio/aac");
+  assert.match(s.seen[1].text, /name="file"; filename="audio\.aac"\r\nContent-Type: audio\/aac\r\n\r\n\xff\xf1/);
+  assert.ok(s.seen[1].body.includes(note));
+});
+
+test("stt: an \"openai\" backend's file is named for what it is, whatever the sender called it", async () => {
+  const s = await standIn(says("ok"));
+  const t = createTranscriber({ backends: [cloud(s.url)] });
+  const m4a = Buffer.concat([Buffer.from([0, 0, 0, 28]), Buffer.from("ftypM4A isommp42 and the rest of it")]);
+  await t.transcribe(m4a, "audio/aac");                     // an MP4 file sent as "audio/aac"
+  assert.match(s.seen[0].text, /filename="audio\.m4a"\r\nContent-Type: audio\/mp4\r\n/);
+  await t.transcribe(wav(8), "application/octet-stream");
+  assert.match(s.seen[1].text, /filename="audio\.wav"\r\nContent-Type: audio\/wav\r\n/);
+  await t.transcribe(Buffer.from("OggS\0\x02 opus opus opus", "latin1"), "audio/webm");
+  assert.match(s.seen[2].text, /filename="audio\.ogg"\r\nContent-Type: audio\/ogg\r\n/);
+  await t.transcribe(new Uint8Array([9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9]), "audio/webm;codecs=opus");   // unknown bytes: go by the type
+  assert.match(s.seen[3].text, /filename="audio\.webm"\r\nContent-Type: audio\/webm;codecs=opus\r\n/);
 });
 
 // --- text to speech ------------------------------------------------------------------------------

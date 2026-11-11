@@ -3,6 +3,7 @@
 // order, and one of them may be an OpenAI-style service (its own, or a cloud one): the audio
 // then goes where the app said, and only there. Nothing here keeps it: once it is text, the
 // bytes are the caller's to drop.
+import { adtsToM4a, sniffAudio } from "./aac.js";
 import { baseOf, bearer, isTimeout, openaiUp, reasonIn, refusal, safeText, shouldMoveOn, type Via } from "./backend.js";
 
 /** Why a transcription didn't happen, for the app to word in its own way. */
@@ -86,6 +87,20 @@ export function fileNameFor(contentType: string | undefined): string {
   return `audio.${ext}`;
 }
 
+const SNIFFED_TYPES: Record<string, string> = { m4a: "audio/mp4", ogg: "audio/ogg", wav: "audio/wav", flac: "audio/flac", webm: "audio/webm", mp3: "audio/mpeg" };
+
+/** The recording as an OpenAI-style service wants it: named (and typed) for what the bytes are. */
+function forOpenai(audio: Uint8Array, contentType: string | undefined): { bytes: Uint8Array; type: string; name: string } {
+  const is = sniffAudio(audio);
+  if (is === "aac") {
+    const m4a = adtsToM4a(audio);
+    if (m4a) return { bytes: m4a, type: "audio/mp4", name: "audio.m4a" };
+  } else if (is) {
+    return { bytes: audio, type: SNIFFED_TYPES[is]!, name: `audio.${is}` };
+  }
+  return { bytes: audio, type: contentType || "application/octet-stream", name: fileNameFor(contentType) };
+}
+
 type Attempt = { result: TranscribeResult; moveOn: boolean };
 type Ready = { backend: SttBackend; base: string; via: SttVia };
 
@@ -104,7 +119,11 @@ export function createTranscriber(opts: TranscriberOptions): Transcriber {
     const key = openai ? backend.apiKey : undefined;
     const wait = (openai ? backend.timeoutMs : undefined) ?? timeoutMs;
     const form = new FormData();
-    form.append("file", new Blob([audio as Uint8Array<ArrayBuffer>], { type: contentType || "application/octet-stream" }), fileNameFor(contentType));
+    // whisper.cpp reads anything ffmpeg does. An OpenAI-style service goes by what the file is
+    // and what it is called: name it for what it really is, and put a bare AAC stream (a voice
+    // note from some messengers) into an MP4 file first.
+    const file = openai ? forOpenai(audio, contentType) : { bytes: audio, type: contentType || "application/octet-stream", name: fileNameFor(contentType) };
+    form.append("file", new Blob([file.bytes as Uint8Array<ArrayBuffer>], { type: file.type }), file.name);
     if (openai) form.append("model", backend.model);
     form.append("response_format", "json");
     form.append("temperature", "0");
